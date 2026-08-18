@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge"
 import { WorkspaceMessage } from "@/app/actions/workspace"
 import { sendTeamMessage } from "@/app/actions/workspace"
 import { toast } from "sonner"
-import { MembershipRole } from "@prisma/client"
+import type { MembershipRole } from "@prisma/client"
 
 interface WorkspaceChatProps {
   teamId: string

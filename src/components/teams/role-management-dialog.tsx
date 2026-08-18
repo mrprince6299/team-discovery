@@ -17,7 +17,7 @@ import { type TeamRoleDetails } from "./role-card"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Loader2, Plus, Check } from "lucide-react"
-import { PreferredExperience } from "@prisma/client"
+import type { PreferredExperience } from "@prisma/client"
 
 interface RoleManagementDialogProps {
   teamId: string

@@ -26,7 +26,7 @@ import {
 import { WorkspaceFile } from "@/app/actions/workspace"
 import { addTeamFile, deleteTeamFile } from "@/app/actions/workspace"
 import { toast } from "sonner"
-import { MembershipRole } from "@prisma/client"
+import type { MembershipRole } from "@prisma/client"
 
 interface WorkspaceFilesPanelProps {
   teamId: string

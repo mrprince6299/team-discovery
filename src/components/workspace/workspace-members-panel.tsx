@@ -14,7 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { WorkspaceMember } from "@/app/actions/workspace"
-import { MembershipRole } from "@prisma/client"
+import type { MembershipRole } from "@prisma/client"
 import { PeerReviewModal } from "@/components/ratings/peer-review-modal"
 
 interface WorkspaceMembersPanelProps {

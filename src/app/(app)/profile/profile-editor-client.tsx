@@ -34,7 +34,7 @@ import {
   createAchievement,
   deleteAchievement,
 } from "@/app/actions/profile"
-import { Availability, SkillLevel } from "@prisma/client"
+import type { Availability, SkillLevel } from "@prisma/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -133,7 +133,7 @@ export function ProfileEditorClient({
   // Modal Dialog States
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false)
   const [selectedSkillId, setSelectedSkillId] = useState("")
-  const [selectedSkillLevel, setSelectedSkillLevel] = useState<SkillLevel>(SkillLevel.INTERMEDIATE)
+  const [selectedSkillLevel, setSelectedSkillLevel] = useState<SkillLevel>("INTERMEDIATE")
 
   const [isAddInterestOpen, setIsAddInterestOpen] = useState(false)
   const [selectedInterestSkillId, setSelectedInterestSkillId] = useState("")
@@ -604,10 +604,10 @@ export function ProfileEditorClient({
                       <SelectValue placeholder="Select availability" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={Availability.AVAILABLE}>Available</SelectItem>
-                      <SelectItem value={Availability.LOOKING_FOR_TEAM}>Looking For Team</SelectItem>
-                      <SelectItem value={Availability.BUSY}>Busy</SelectItem>
-                      <SelectItem value={Availability.TEAM_FULL}>Team Full</SelectItem>
+                      <SelectItem value="AVAILABLE">Available</SelectItem>
+                      <SelectItem value="LOOKING_FOR_TEAM">Looking For Team</SelectItem>
+                      <SelectItem value="BUSY">Busy</SelectItem>
+                      <SelectItem value="TEAM_FULL">Team Full</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -769,9 +769,9 @@ export function ProfileEditorClient({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value={SkillLevel.BEGINNER}>Beginner (Familiar / Coursework)</SelectItem>
-                          <SelectItem value={SkillLevel.INTERMEDIATE}>Intermediate (Built 1-2 projects)</SelectItem>
-                          <SelectItem value={SkillLevel.ADVANCED}>Advanced (Production / Hackathon Winner)</SelectItem>
+                          <SelectItem value="BEGINNER">Beginner (Familiar / Coursework)</SelectItem>
+                          <SelectItem value="INTERMEDIATE">Intermediate (Built 1-2 projects)</SelectItem>
+                          <SelectItem value="ADVANCED">Advanced (Production / Hackathon Winner)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

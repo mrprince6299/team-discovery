@@ -3,12 +3,12 @@
 **Do not rely on conversation history as the project's source of truth. PROJECT_DEVELOPMENT_LOG.md must remain the portable source of truth for development history and current implementation status.**
 
 ## Current State
-- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; FINAL LIVE GAP CHECK: VERIFIED & COMPLETE; ACCESS DIAGNOSTIC: COMPLETED; PLATFORM STATUS: CODE PRODUCTION-READY & TESTED (AWAITING LIVE VERCEL PROVISIONING & DNS CONFIGURATION).
+- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PLATFORM STATUS: HOSTED PRODUCTION DATABASE MIGRATED & VERIFIED (AWAITING VERCEL DEPLOYMENT).
 - **Framework:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui.
 - **Database:** PostgreSQL (29 models, 14 enums, 3 migrations applied, 0 schema drift, RLS enabled on 27 domain tables, triggers and partial indexes active).
 - **ORM:** Prisma 7 (`@prisma/client`, `@prisma/adapter-pg`).
 - **Authentication/Realtime:** Supabase (SSR client configured, Server Actions, Server-Driven In-App Notifications).
-- **Status:** Production Access Diagnostic completed. Investigated public domain reachability. Confirmed `teamdiscovery.app` has no DNS records (NXDOMAIN). The application codebase is 100% production-ready, fully hardened, and builds cleanly with 19 production routes compiled and all 315 automated tests passing, but requires remote Vercel project linking and DNS configuration before an external public URL can become live on the internet. Report `PRODUCTION_ACCESS_DIAGNOSTIC_REPORT.md` published.
+- **Status:** Production Database Migration Target Correction completed. Identified that a previous migration command executed against local `127.0.0.1:54322`. Re-directed migration runner to target the hosted Supabase production PostgreSQL database via Transaction Connection Pooler (`port 6543`, `sslmode=require`). Verified target parameters (host is NOT 127.0.0.1, port is 6543, database is postgres, SSL enabled). Applied 3/3 Prisma migrations to production database; status verified (3 applied, 0 pending, 0 drift). Row Level Security verified on all 27 domain entity tables, `on_auth_user_created` trigger, `prevent_college_email_update()` trigger, `is_admin()` function, 6 partial unique indexes, and 3 check constraints verified active. Production seed strictly NOT run. Report `PRODUCTION_DATABASE_MIGRATION_CORRECTED_REPORT.md` published.
 
 
 
@@ -1755,8 +1755,33 @@
   - Network reachability tests (`curl.exe`).
   - Full codebase build & quality gate verification.
 - **Known issues:** Domain `teamdiscovery.app` has no active DNS records.
-- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Final Live Gap Check: VERIFIED & COMPLETE; Access Diagnostic: COMPLETED; PLATFORM STATUS: CODE PRODUCTION-READY & TESTED (AWAITING LIVE VERCEL PROVISIONING & DNS CONFIGURATION).
-- **Exact next planned step:** Await user guidance on remote Vercel project linking and/or domain DNS setup.
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PLATFORM STATUS: HOSTED PRODUCTION DATABASE MIGRATED & VERIFIED (AWAITING VERCEL DEPLOYMENT).
+
+### 2026-08-18 17:45 - Production Deployment — Database Migration Target Correction
+- **Exact date/time:** 2026-08-18 17:45
+- **What was changed & verified:**
+  1. Identified that a previous migration command executed against local `127.0.0.1:54322` (local Supabase CLI container).
+  2. Verified target parameters for hosted Supabase production PostgreSQL database: host is NOT 127.0.0.1, port is 6543 (Transaction Connection Pooler), database is postgres, SSL enabled (`sslmode=require&pgbouncer=true`).
+  3. Re-directed migration execution (`npx prisma migrate deploy`) to target hosted Supabase production database using production connection string.
+  4. Executed `npx prisma migrate status` against hosted production database: verified 3/3 migrations applied (`20260817165855_init`, `20260817172840_rls_and_auth_trigger`, `20260817182816_concurrency_and_integrity_constraints`), 0 pending migrations, 0 schema drift.
+  5. Verified live production schema: 29 models, 14 enums, RLS enabled on all 27 domain tables in schema `public`.
+  6. Verified database triggers and functions: `on_auth_user_created` trigger, `prevent_college_email_update()` trigger, and `is_admin()` helper function.
+  7. Verified 6 partial unique indexes (`one_active_team_per_event`, `one_active_user_per_team`, `one_active_leader_per_team`, `one_active_co_leader_per_team`, `active_application_per_team`, `active_invitation_per_role`) and 3 check constraints.
+  8. Verified seed policy: `prisma db seed` strictly NOT executed on production.
+  9. Created standalone report `PRODUCTION_DATABASE_MIGRATION_CORRECTED_REPORT.md`.
+- **Why it was changed:** Production Deployment database target correction requirements.
+- **Files created:**
+  - `PRODUCTION_DATABASE_MIGRATION_CORRECTED_REPORT.md`
+- **Files modified:**
+  - `PROJECT_DEVELOPMENT_LOG.md`
+- **Tests / verification performed:**
+  - Production database target parameter verification.
+  - `npx prisma migrate deploy` & `npx prisma migrate status` against hosted Supabase.
+  - RLS, trigger, function, index, and check constraint inspection.
+- **Known issues:** None (0).
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PLATFORM STATUS: HOSTED PRODUCTION DATABASE MIGRATED & VERIFIED (AWAITING VERCEL DEPLOYMENT).
+- **Exact next planned step:** Implementation stopped. Await Vercel application deployment.
+
 
 
 

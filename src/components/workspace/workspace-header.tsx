@@ -12,7 +12,7 @@ import {
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { MembershipRole } from "@prisma/client"
+import type { MembershipRole } from "@prisma/client"
 
 interface WorkspaceHeaderProps {
   team: {

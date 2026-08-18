@@ -26,7 +26,7 @@ import {
 import { WorkspaceLink } from "@/app/actions/workspace"
 import { addTeamLink, deleteTeamLink } from "@/app/actions/workspace"
 import { toast } from "sonner"
-import { MembershipRole } from "@prisma/client"
+import type { MembershipRole } from "@prisma/client"
 
 interface WorkspaceLinksPanelProps {
   teamId: string
