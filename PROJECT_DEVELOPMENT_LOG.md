@@ -3,12 +3,12 @@
 **Do not rely on conversation history as the project's source of truth. PROJECT_DEVELOPMENT_LOG.md must remain the portable source of truth for development history and current implementation status.**
 
 ## Current State
-- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA BOUNDARY FIX: VERIFIED & PUSHED (COMMIT 392305e); PLATFORM STATUS: CODE BUILD VERIFIED, GITHUB MAIN UPDATED, AWAITING LIVE URL SMOKE TEST.
+- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA GENERATION FIX: VERIFIED & PUSHED (COMMIT 3edcbc6); PLATFORM STATUS: VERCEL BUILD LIFECYCLE VERIFIED, GITHUB MAIN UPDATED, AWAITING VERCEL DEPLOYMENT & LIVE URL SMOKE TEST.
 - **Framework:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui.
 - **Database:** PostgreSQL (29 models, 14 enums, 3 migrations applied, 0 schema drift, RLS enabled on 27 domain tables, triggers and partial indexes active).
 - **ORM:** Prisma 7 (`@prisma/client`, `@prisma/adapter-pg`).
 - **Authentication/Realtime:** Supabase (SSR client configured, Server Actions, Server-Driven In-App Notifications).
-- **Status:** Vercel production build failure resolved. Diagnosed root cause: Client Components (`"use client"`) imported runtime `@prisma/client` objects (`Availability`, `SkillLevel`, `MembershipRole`, `PreferredExperience`), triggering `@prisma/client/index-browser.js` bundling during Next.js production build. Converted all Client Component Prisma imports to type-only imports (`import type`) and replaced UI prop values with string constants (`"AVAILABLE"`, `"BEGINNER"`, `"INTERMEDIATE"`, `"ADVANCED"`). Verified TypeScript compiler (0 errors), ESLint (0 errors), Next.js production build (19 routes compiled), and 13 integration test suites (315/315 passed). Committed fix (`392305e`) and pushed to `origin/main`. Report `VERCEL_BUILD_FAILURE_FIX_REPORT.md` published.
+- **Status:** Vercel build failure #2 resolved. Diagnosed root cause: `package.json` build script was `"next build"`, which ran in Vercel's clean build environment without executing `prisma generate` first, causing missing `@prisma/client` export typecheck errors during Next.js production build. Updated `package.json` build script to `"prisma generate && next build"` and added `"postinstall": "prisma generate"`. Verified `npx prisma generate` (288ms), `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors), `npm run build` (19 routes compiled), and 13 integration test suites (315/315 passed). Committed fix (`3edcbc6`) and pushed to `origin/main`. Report `VERCEL_BUILD_FAILURE_2_PRISMA_GENERATION_FIX_REPORT.md` published.
 
 
 
@@ -1812,8 +1812,37 @@
   - `npm run build` (0 build errors).
   - 13 test suites (315/315 passed).
 - **Known issues:** None (0).
-- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA BOUNDARY FIX: VERIFIED & PUSHED (COMMIT 392305e); PLATFORM STATUS: CODE BUILD VERIFIED, GITHUB MAIN UPDATED, AWAITING LIVE URL SMOKE TEST.
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA GENERATION FIX: VERIFIED & PUSHED (COMMIT 3edcbc6); PLATFORM STATUS: VERCEL BUILD LIFECYCLE VERIFIED, GITHUB MAIN UPDATED, AWAITING VERCEL DEPLOYMENT & LIVE URL SMOKE TEST.
+
+### 2026-08-18 18:24 - Vercel Deployment — Build Failure #2 & Prisma Client Generation Lifecycle Fix
+- **Exact date/time:** 2026-08-18 18:24
+- **What was changed & verified:**
+  1. Diagnosed Vercel build failure #2: Next.js TypeScript check failed in Vercel's clean build environment because `@prisma/client` types were not generated prior to `next build`.
+  2. Verified root cause in `package.json`: build script was `"next build"` without `prisma generate`.
+  3. Updated `package.json` build script to `"prisma generate && next build"` and added `"postinstall": "prisma generate"`.
+  4. Tested `npx prisma generate` locally: generated Prisma Client (v7.9.1) in 288ms.
+  5. Ran local TypeScript compilation check: `npx tsc --noEmit` $\rightarrow$ `0 Errors`.
+  6. Ran local ESLint audit: `npm run lint` $\rightarrow$ `0 Errors, 0 Warnings`.
+  7. Ran local Next.js production build: `npm run build` $\rightarrow$ `prisma generate && next build succeeded (19 production routes compiled)`.
+  8. Ran full 13 regression test suites: `315 / 315 tests passed (0 failed)`.
+  9. Staged, committed (`Ensure Prisma Client generation before Vercel build`), and pushed commit `3edcbc6` to GitHub `origin/main`.
+  10. Created standalone report `VERCEL_BUILD_FAILURE_2_PRISMA_GENERATION_FIX_REPORT.md`.
+- **Why it was changed:** Vercel build pipeline Prisma client generation reliability.
+- **Files created:**
+  - `VERCEL_BUILD_FAILURE_2_PRISMA_GENERATION_FIX_REPORT.md`
+- **Files modified:**
+  - `package.json`
+  - `PROJECT_DEVELOPMENT_LOG.md`
+- **Tests / verification performed:**
+  - `npx prisma generate` (288ms).
+  - `npx tsc --noEmit` (0 errors).
+  - `npm run lint` (0 errors).
+  - `npm run build` (0 build errors, 19 routes).
+  - 13 test suites (315/315 passed).
+- **Known issues:** None (0).
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA GENERATION FIX: VERIFIED & PUSHED (COMMIT 3edcbc6); PLATFORM STATUS: VERCEL BUILD LIFECYCLE VERIFIED, GITHUB MAIN UPDATED, AWAITING VERCEL DEPLOYMENT & LIVE URL SMOKE TEST.
 - **Exact next planned step:** Trigger Vercel redeployment from updated `main` branch.
+
 
 
 
