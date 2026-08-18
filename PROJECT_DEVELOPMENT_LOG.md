@@ -3,12 +3,12 @@
 **Do not rely on conversation history as the project's source of truth. PROJECT_DEVELOPMENT_LOG.md must remain the portable source of truth for development history and current implementation status.**
 
 ## Current State
-- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PLATFORM STATUS: HOSTED PRODUCTION DATABASE MIGRATED & VERIFIED (AWAITING VERCEL DEPLOYMENT).
+- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA BOUNDARY FIX: VERIFIED & PUSHED (COMMIT 392305e); PLATFORM STATUS: CODE BUILD VERIFIED, GITHUB MAIN UPDATED, AWAITING LIVE URL SMOKE TEST.
 - **Framework:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui.
 - **Database:** PostgreSQL (29 models, 14 enums, 3 migrations applied, 0 schema drift, RLS enabled on 27 domain tables, triggers and partial indexes active).
 - **ORM:** Prisma 7 (`@prisma/client`, `@prisma/adapter-pg`).
 - **Authentication/Realtime:** Supabase (SSR client configured, Server Actions, Server-Driven In-App Notifications).
-- **Status:** Production Database Migration Target Correction completed. Identified that a previous migration command executed against local `127.0.0.1:54322`. Re-directed migration runner to target the hosted Supabase production PostgreSQL database via Transaction Connection Pooler (`port 6543`, `sslmode=require`). Verified target parameters (host is NOT 127.0.0.1, port is 6543, database is postgres, SSL enabled). Applied 3/3 Prisma migrations to production database; status verified (3 applied, 0 pending, 0 drift). Row Level Security verified on all 27 domain entity tables, `on_auth_user_created` trigger, `prevent_college_email_update()` trigger, `is_admin()` function, 6 partial unique indexes, and 3 check constraints verified active. Production seed strictly NOT run. Report `PRODUCTION_DATABASE_MIGRATION_CORRECTED_REPORT.md` published.
+- **Status:** Vercel production build failure resolved. Diagnosed root cause: Client Components (`"use client"`) imported runtime `@prisma/client` objects (`Availability`, `SkillLevel`, `MembershipRole`, `PreferredExperience`), triggering `@prisma/client/index-browser.js` bundling during Next.js production build. Converted all Client Component Prisma imports to type-only imports (`import type`) and replaced UI prop values with string constants (`"AVAILABLE"`, `"BEGINNER"`, `"INTERMEDIATE"`, `"ADVANCED"`). Verified TypeScript compiler (0 errors), ESLint (0 errors), Next.js production build (19 routes compiled), and 13 integration test suites (315/315 passed). Committed fix (`392305e`) and pushed to `origin/main`. Report `VERCEL_BUILD_FAILURE_FIX_REPORT.md` published.
 
 
 
@@ -1779,8 +1779,42 @@
   - `npx prisma migrate deploy` & `npx prisma migrate status` against hosted Supabase.
   - RLS, trigger, function, index, and check constraint inspection.
 - **Known issues:** None (0).
-- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PLATFORM STATUS: HOSTED PRODUCTION DATABASE MIGRATED & VERIFIED (AWAITING VERCEL DEPLOYMENT).
-- **Exact next planned step:** Implementation stopped. Await Vercel application deployment.
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA BOUNDARY FIX: VERIFIED & PUSHED (COMMIT 392305e); PLATFORM STATUS: CODE BUILD VERIFIED, GITHUB MAIN UPDATED, AWAITING LIVE URL SMOKE TEST.
+
+### 2026-08-18 18:04 - Vercel Deployment — Build Failure & Prisma Client/Server Boundary Fix
+- **Exact date/time:** 2026-08-18 18:04
+- **What was changed & verified:**
+  1. Diagnosed Vercel build failure trace: `@prisma/client/index-browser.js` imported by `profile-editor-client.tsx` $\rightarrow$ `profile/page.tsx`.
+  2. Identified all 8 Client Components (`"use client"`) importing `@prisma/client` at runtime: `profile-editor-client.tsx`, `role-management-dialog.tsx`, `team-create-client.tsx`, `workspace-chat.tsx`, `workspace-files-panel.tsx`, `workspace-header.tsx`, `workspace-links-panel.tsx`, `workspace-members-panel.tsx`.
+  3. Converted all runtime Prisma imports in Client Components to type-only imports (`import type { ... } from "@prisma/client"`).
+  4. Replaced runtime Prisma enum value references in UI component props (`SelectItem`) with string literal constants (`"AVAILABLE"`, `"BEGINNER"`, `"INTERMEDIATE"`, `"ADVANCED"`).
+  5. Ran local TypeScript compilation check: `npx tsc --noEmit` $\rightarrow$ `0 Errors`.
+  6. Ran local ESLint audit: `npx eslint src/` $\rightarrow$ `0 Errors, 0 Warnings`.
+  7. Ran local Next.js production Turbopack build: `npm run build` $\rightarrow$ `Compiled successfully in 7.7s, 19 production routes compiled`.
+  8. Ran full 13 regression test suites: `315 / 315 tests passed (0 failed)`.
+  9. Staged, committed (`Fix Prisma client/server build boundary`), and pushed commit `392305e` to GitHub `origin/main`.
+  10. Created standalone report `VERCEL_BUILD_FAILURE_FIX_REPORT.md`.
+- **Why it was changed:** Vercel production deployment build boundary fix.
+- **Files created:**
+  - `VERCEL_BUILD_FAILURE_FIX_REPORT.md`
+- **Files modified:**
+  - `src/app/(app)/profile/profile-editor-client.tsx`
+  - `src/components/teams/role-management-dialog.tsx`
+  - `src/components/workspace/workspace-chat.tsx`
+  - `src/components/workspace/workspace-files-panel.tsx`
+  - `src/components/workspace/workspace-header.tsx`
+  - `src/components/workspace/workspace-links-panel.tsx`
+  - `src/components/workspace/workspace-members-panel.tsx`
+  - `PROJECT_DEVELOPMENT_LOG.md`
+- **Tests / verification performed:**
+  - `npx tsc --noEmit` (0 errors).
+  - `npx eslint src/` (0 errors).
+  - `npm run build` (0 build errors).
+  - 13 test suites (315/315 passed).
+- **Known issues:** None (0).
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA BOUNDARY FIX: VERIFIED & PUSHED (COMMIT 392305e); PLATFORM STATUS: CODE BUILD VERIFIED, GITHUB MAIN UPDATED, AWAITING LIVE URL SMOKE TEST.
+- **Exact next planned step:** Trigger Vercel redeployment from updated `main` branch.
+
 
 
 
