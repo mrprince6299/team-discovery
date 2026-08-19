@@ -15,6 +15,7 @@ import {
   CheckCircle2,
   MessageSquare,
   PlusCircle,
+  LogOut,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -24,6 +25,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { RoleCard, type TeamRoleDetails } from "./role-card"
 import { ApplyModal } from "./apply-modal"
 import { RoleManagementDialog } from "./role-management-dialog"
+import { LeaveTeamDialog } from "./leave-team-dialog"
+import { TransferLeadershipDialog, type EligibleMember } from "./transfer-leadership-dialog"
 
 interface TeamMemberDetails {
   id: string
@@ -79,7 +82,20 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
   const [selectedRoleForApply, setSelectedRoleForApply] = useState<TeamRoleDetails | null>(null)
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false)
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false)
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false)
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [transferTargetMemberId, setTransferTargetMemberId] = useState<string | undefined>(undefined)
   const [hasAppliedLocally, setHasAppliedLocally] = useState(false)
+
+  const eligibleMembers: EligibleMember[] = team.members
+    .filter((m) => m.membershipRole !== "LEADER")
+    .map((m) => ({
+      userId: m.user.id,
+      name: m.user.name,
+      username: m.user.username,
+      membershipRole: m.membershipRole,
+      profilePhoto: m.user.profilePhoto,
+    }))
 
   const activeRoles = team.roles.filter(
     (r) => ["ACTIVE", "PARTIALLY_FILLED"].includes(r.status) && !r.isExpired
@@ -180,10 +196,24 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
               </div>
 
               {team.isCurrentMember && (
-                <Badge variant="exact" className="text-xs font-bold gap-1">
-                  <CheckCircle2 className="size-3" />
-                  <span>{team.isCurrentLeader ? "Team Leader" : "Active Member"}</span>
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="exact" className="text-xs font-bold gap-1">
+                    <CheckCircle2 className="size-3" />
+                    <span>{team.isCurrentLeader ? "Team Leader" : "Active Member"}</span>
+                  </Badge>
+                  {!team.isCurrentLeader && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsLeaveDialogOpen(true)}
+                      className="h-6 px-2 text-[11px] font-semibold text-destructive hover:bg-destructive/10 border-destructive/30 hover:border-destructive/50 gap-1 shadow-2xs"
+                    >
+                      <LogOut className="size-2.5" />
+                      <span>Leave Squad</span>
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -256,9 +286,26 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
               </h2>
               <p className="text-xs text-muted-foreground">Active members and leaders.</p>
             </div>
-            <Badge variant="outline" className="text-xs">
-              {team.members.length}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                {team.members.length}
+              </Badge>
+              {team.isCurrentLeader && eligibleMembers.length > 0 && (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setTransferTargetMemberId(undefined)
+                    setIsTransferModalOpen(true)
+                  }}
+                  className="h-7 text-xs font-semibold gap-1 border-amber-500/30 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                >
+                  <Crown className="size-3 text-amber-500" />
+                  <span>Transfer Leadership</span>
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-3">
@@ -319,13 +366,28 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
                         </div>
                       )}
 
-                      <div className="pt-2">
+                      <div className="pt-2 flex items-center gap-2 flex-wrap">
                         <Button asChild variant="ghost" size="sm" className="h-6 px-2 text-[11px] gap-1 text-primary hover:text-primary">
                           <Link href={`/users/${member.user.id}`}>
                             <span>View Profile</span>
                             <ExternalLink className="size-2.5" />
                           </Link>
                         </Button>
+                        {team.isCurrentLeader && !isLeader && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setTransferTargetMemberId(member.user.id)
+                              setIsTransferModalOpen(true)
+                            }}
+                            className="h-6 px-2 text-[11px] gap-1 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                          >
+                            <Crown className="size-2.5 text-amber-500" />
+                            <span>Make Leader</span>
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -357,6 +419,29 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
           teamId={team.id}
           isOpen={isCreateRoleModalOpen}
           onOpenChange={setIsCreateRoleModalOpen}
+        />
+      )}
+
+      {/* Leave Squad Modal for Non-Leader Active Members */}
+      {team.isCurrentMember && !team.isCurrentLeader && (
+        <LeaveTeamDialog
+          isOpen={isLeaveDialogOpen}
+          onOpenChange={setIsLeaveDialogOpen}
+          teamId={team.id}
+          teamName={team.name}
+          redirectTo="/teams"
+        />
+      )}
+
+      {/* Transfer Leadership Modal for Leaders */}
+      {team.isCurrentLeader && (
+        <TransferLeadershipDialog
+          isOpen={isTransferModalOpen}
+          onOpenChange={setIsTransferModalOpen}
+          teamId={team.id}
+          teamName={team.name}
+          eligibleMembers={eligibleMembers}
+          initialSelectedMemberId={transferTargetMemberId}
         />
       )}
     </div>

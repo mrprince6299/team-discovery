@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { useState } from "react"
 import Link from "next/link"
 import {
   Users,
@@ -9,6 +10,7 @@ import {
   ExternalLink,
   GraduationCap,
   Sparkles,
+  LogOut,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +18,8 @@ import { Button } from "@/components/ui/button"
 import { WorkspaceMember } from "@/app/actions/workspace"
 import type { MembershipRole } from "@prisma/client"
 import { PeerReviewModal } from "@/components/ratings/peer-review-modal"
+import { LeaveTeamDialog } from "@/components/teams/leave-team-dialog"
+import { TransferLeadershipDialog, type EligibleMember } from "@/components/teams/transfer-leadership-dialog"
 
 interface WorkspaceMembersPanelProps {
   members: WorkspaceMember[]
@@ -30,6 +34,23 @@ export function WorkspaceMembersPanel({
   teamId,
   teamName = "Squad",
 }: WorkspaceMembersPanelProps) {
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false)
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false)
+  const [transferTargetId, setTransferTargetId] = useState<string | undefined>(undefined)
+
+  const myMembership = members.find((m) => m.userId === currentUserId)
+  const isLeader = myMembership?.membershipRole === "LEADER"
+
+  const eligibleMembers: EligibleMember[] = members
+    .filter((m) => m.membershipRole !== "LEADER" && m.userId !== currentUserId)
+    .map((m) => ({
+      userId: m.userId,
+      name: m.name,
+      username: m.username,
+      membershipRole: m.membershipRole,
+      profilePhoto: m.avatarUrl,
+    }))
+
   const getRoleBadge = (role: MembershipRole) => {
     switch (role) {
       case "LEADER":
@@ -64,21 +85,52 @@ export function WorkspaceMembersPanel({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div className="flex items-center gap-2">
           <Users className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold text-foreground">
             Active Squad Members
           </h3>
         </div>
-        <Badge variant="secondary" className="text-xs">
-          {members.length} {members.length === 1 ? "member" : "members"}
-        </Badge>
+        <div className="flex items-center gap-2">
+          <Badge variant="secondary" className="text-xs">
+            {members.length} {members.length === 1 ? "member" : "members"}
+          </Badge>
+          {isLeader && eligibleMembers.length > 0 && teamId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setTransferTargetId(undefined)
+                setIsTransferDialogOpen(true)
+              }}
+              className="h-7 px-2 text-xs font-semibold gap-1 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 border-amber-500/30 hover:border-amber-500/50"
+            >
+              <Crown className="size-3 text-amber-500" />
+              <span>Transfer Leadership</span>
+            </Button>
+          )}
+          {myMembership && !isLeader && teamId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsLeaveDialogOpen(true)}
+              className="h-7 px-2 text-xs font-semibold gap-1 text-destructive hover:bg-destructive/10 border-destructive/30 hover:border-destructive/50"
+            >
+              <LogOut className="size-3" />
+              <span>Leave Squad</span>
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-2.5">
         {members.map((m) => {
           const isMe = m.userId === currentUserId
+          const memberIsLeader = m.membershipRole === "LEADER"
+
           return (
             <div
               key={m.id}
@@ -130,8 +182,37 @@ export function WorkspaceMembersPanel({
                 </div>
               </div>
 
-              {/* Actions: Review Modal for peers + Profile Link */}
+              {/* Actions: Make Leader / Review Modal for peers / Leave Button for self / Profile Link */}
               <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                {isMe && !memberIsLeader && teamId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsLeaveDialogOpen(true)}
+                    className="h-8 px-2 text-xs font-medium text-destructive hover:text-destructive hover:bg-destructive/10 gap-1"
+                  >
+                    <LogOut className="size-3.5" />
+                    <span>Leave</span>
+                  </Button>
+                )}
+
+                {!isMe && isLeader && teamId && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setTransferTargetId(m.userId)
+                      setIsTransferDialogOpen(true)
+                    }}
+                    className="h-8 px-2 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 gap-1"
+                  >
+                    <Crown className="size-3.5 text-amber-500" />
+                    <span>Make Leader</span>
+                  </Button>
+                )}
+
                 {!isMe && teamId && (
                   <PeerReviewModal
                     teamId={teamId}
@@ -159,6 +240,27 @@ export function WorkspaceMembersPanel({
           )
         })}
       </div>
+
+      {teamId && (
+        <LeaveTeamDialog
+          isOpen={isLeaveDialogOpen}
+          onOpenChange={setIsLeaveDialogOpen}
+          teamId={teamId}
+          teamName={teamName}
+          redirectTo="/dashboard"
+        />
+      )}
+
+      {teamId && (
+        <TransferLeadershipDialog
+          isOpen={isTransferDialogOpen}
+          onOpenChange={setIsTransferDialogOpen}
+          teamId={teamId}
+          teamName={teamName}
+          eligibleMembers={eligibleMembers}
+          initialSelectedMemberId={transferTargetId}
+        />
+      )}
     </div>
   )
 }

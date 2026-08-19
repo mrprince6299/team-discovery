@@ -13,12 +13,14 @@ import {
   Edit2,
   Compass,
   AlertTriangle,
+  Trash2,
 } from "lucide-react"
 import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { CloseRoleDialog } from "./close-role-dialog"
 import { RoleManagementDialog } from "./role-management-dialog"
+import { DeleteRoleDialog } from "./delete-role-dialog"
 
 export interface TeamRoleDetails {
   id: string
@@ -58,11 +60,13 @@ export function RoleCard({
 }: RoleCardProps) {
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const isClosed = role.status === "CLOSED"
   const isExpired = role.status === "EXPIRED" || role.isExpired
   const isFull = role.status === "FULL" || role.remainingSeats === 0
   const isOpen = (role.status === "ACTIVE" || role.status === "PARTIALLY_FILLED") && !isExpired && !isClosed
+  const isVacant = role.remainingSeats === role.seatsRequired
 
   let statusBadgeVariant: "exact" | "related" | "secondary" | "destructive" | "outline" = "outline"
   let statusText = role.status
@@ -178,7 +182,7 @@ export function RoleCard({
         <CardFooter className="p-5 pt-3 border-t border-border/60 bg-muted/10 rounded-b-2xl flex flex-col items-stretch gap-2">
           {/* Leader Controls Strip */}
           {isCurrentLeader && (
-            <div className="flex items-center gap-2 w-full pt-1 pb-1">
+            <div className="flex items-center gap-2 w-full pt-1 pb-1 flex-wrap">
               <Button
                 type="button"
                 variant="outline"
@@ -196,10 +200,24 @@ export function RoleCard({
                   variant="outline"
                   size="sm"
                   onClick={() => setIsCloseDialogOpen(true)}
-                  className="h-8 text-xs font-semibold gap-1.5 text-destructive hover:bg-destructive/10 border-destructive/30"
+                  className="h-8 text-xs font-semibold gap-1 text-destructive hover:bg-destructive/10 border-destructive/30"
                 >
                   <AlertTriangle className="size-3" />
                   <span>Close</span>
+                </Button>
+              )}
+
+              {isVacant && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  className="h-8 text-xs font-semibold gap-1 text-destructive hover:bg-destructive/10 border-destructive/30 hover:border-destructive/50"
+                  title="Delete vacant role"
+                >
+                  <Trash2 className="size-3" />
+                  <span>Delete</span>
                 </Button>
               )}
 
@@ -260,6 +278,14 @@ export function RoleCard({
           onSuccess={onRoleUpdated}
         />
       )}
+
+      <DeleteRoleDialog
+        roleId={role.id}
+        roleName={role.name}
+        isOpen={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        onSuccess={onRoleUpdated}
+      />
     </>
   )
 }

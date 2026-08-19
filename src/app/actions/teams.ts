@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 import { SkillLevel, PreferredExperience, Availability } from '@prisma/client'
@@ -604,6 +605,13 @@ export async function transferLeadership(input: {
       return { success: true }
     })
 
+    if (result.success) {
+      revalidatePath('/teams')
+      revalidatePath(`/teams/${input.teamId}`)
+      revalidatePath(`/teams/${input.teamId}/workspace`)
+      revalidatePath('/dashboard')
+    }
+
     return result
   } catch (err: any) {
     return { error: err.message || 'Failed to transfer leadership.' }
@@ -703,6 +711,13 @@ export async function leaveTeam(input: {
 
       return { success: true }
     })
+
+    if (result.success) {
+      revalidatePath('/teams')
+      revalidatePath(`/teams/${input.teamId}`)
+      revalidatePath(`/teams/${input.teamId}/workspace`)
+      revalidatePath('/dashboard')
+    }
 
     return result
   } catch (err: any) {

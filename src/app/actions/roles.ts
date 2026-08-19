@@ -477,8 +477,10 @@ export async function deleteTeamRole(input: {
 
     try {
       revalidatePath(`/teams/${result.teamId}`)
+      revalidatePath(`/teams/${result.teamId}/workspace`)
       revalidatePath('/teams')
       revalidatePath('/discover')
+      revalidatePath('/dashboard')
     } catch {
       // Safe context ignoring in tests
     }
