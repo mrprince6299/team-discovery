@@ -14,7 +14,6 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
-  CheckCircle2,
   HelpCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -32,6 +31,9 @@ import { Badge } from "@/components/ui/badge"
 import { createTeamWithRoles } from "@/app/actions/teams"
 import { toast } from "sonner"
 import type { SkillLevel, PreferredExperience } from "@prisma/client"
+import { RoleCombobox } from "@/components/common/role-combobox"
+import { SearchableSkillSelector } from "@/components/common/searchable-skill-selector"
+import { SKILL_LEVEL_OPTIONS, EXPERIENCE_LEVEL_OPTIONS } from "@/lib/constants/options"
 
 interface RoleDraft {
   id: string
@@ -99,19 +101,6 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
 
   const handleUpdateRole = (roleId: string, updates: Partial<RoleDraft>) => {
     setRoles((prev) => prev.map((r) => (r.id === roleId ? { ...r, ...updates } : r)))
-  }
-
-  const handleToggleRequiredSkill = (roleId: string, skillId: string) => {
-    setRoles((prev) =>
-      prev.map((r) => {
-        if (r.id !== roleId) return r
-        const isSelected = r.requiredSkillIds.includes(skillId)
-        const updated = isSelected
-          ? r.requiredSkillIds.filter((id) => id !== skillId)
-          : [...r.requiredSkillIds, skillId]
-        return { ...r, requiredSkillIds: updated }
-      })
-    )
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -332,13 +321,22 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
                       <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                         Role Title *
                       </label>
-                      <Input
+                      <RoleCombobox
                         value={role.name}
-                        onChange={(e) => handleUpdateRole(role.id, { name: e.target.value })}
-                        placeholder="e.g. Lead Frontend Engineer, AI Researcher..."
-                        className="h-9 text-xs"
-                        required
+                        onChange={(val, suggestedSkills) => {
+                          const updates: Partial<RoleDraft> = { name: val }
+                          if (suggestedSkills && suggestedSkills.length > 0) {
+                            const existing = role.requiredSkillIds
+                            const newSkills = suggestedSkills.map((sName) => {
+                              const found = availableSkills.find((s) => s.name.toLowerCase() === sName.toLowerCase())
+                              return found ? found.id : sName
+                            })
+                            updates.requiredSkillIds = Array.from(new Set([...existing, ...newSkills]))
+                          }
+                          handleUpdateRole(role.id, updates)
+                        }}
                         disabled={isPending}
+                        placeholder="e.g. Lead Frontend Engineer, AI Researcher..."
                       />
                     </div>
 
@@ -377,9 +375,11 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="BEGINNER">Beginner</SelectItem>
-                          <SelectItem value="INTERMEDIATE">Intermediate</SelectItem>
-                          <SelectItem value="ADVANCED">Advanced</SelectItem>
+                          {SKILL_LEVEL_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -400,10 +400,11 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="ANY">Any Experience Level</SelectItem>
-                          <SelectItem value="BEGINNER">Beginner (0 Projects)</SelectItem>
-                          <SelectItem value="SOME_EXPERIENCE">Some Experience (1+ Projects)</SelectItem>
-                          <SelectItem value="EXPERIENCED">Experienced (2+ Projects)</SelectItem>
+                          {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              {opt.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -425,27 +426,24 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
                       )}
                     </div>
 
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 rounded-xl border border-border/80 bg-muted/20">
-                      {availableSkills.map((skill) => {
-                        const isSelected = role.requiredSkillIds.includes(skill.id)
-                        return (
-                          <button
-                            key={skill.id}
-                            type="button"
-                            onClick={() => handleToggleRequiredSkill(role.id, skill.id)}
-                            disabled={isPending}
-                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs transition-colors cursor-pointer ${
-                              isSelected
-                                ? "border-emerald-500 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 font-bold"
-                                : "border-border bg-card text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            {isSelected && <CheckCircle2 className="size-3 text-emerald-500 shrink-0" />}
-                            <span>{skill.name}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
+                    <SearchableSkillSelector
+                      availableSkills={availableSkills}
+                      selectedSkillIds={role.requiredSkillIds}
+                      onSelectSkill={(skill) => {
+                        const id = skill.id.startsWith('auth-') ? skill.name : skill.id
+                        if (!role.requiredSkillIds.includes(id)) {
+                          handleUpdateRole(role.id, {
+                            requiredSkillIds: [...role.requiredSkillIds, id],
+                          })
+                        }
+                      }}
+                      onRemoveSkill={(id) => {
+                        handleUpdateRole(role.id, {
+                          requiredSkillIds: role.requiredSkillIds.filter((sid) => sid !== id),
+                        })
+                      }}
+                      placeholder="Search and select required skills for this role..."
+                    />
                   </div>
                 </CardContent>
               </Card>

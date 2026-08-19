@@ -131,7 +131,7 @@ export function SignupFormClient() {
                 <span>What happens next?</span>
               </div>
               <p className="text-[11px] leading-relaxed">
-                After signing up, you will land on the verification check screen while your student profile is initiated.
+                After signing up, you will immediately enter your command center to build your profile, form teams, and discover peers.
               </p>
             </div>
           </CardContent>

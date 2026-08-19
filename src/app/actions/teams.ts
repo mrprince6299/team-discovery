@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 import { SkillLevel, PreferredExperience, Availability } from '@prisma/client'
+import { isUserEligibleForCoreFeatures } from '@/lib/policies'
 
 async function getAuthUserId(providedUserId?: string): Promise<string | null> {
   if (providedUserId && process.env.NODE_ENV !== 'production') {
@@ -34,12 +35,12 @@ export async function createTeam(input: {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Verify leader exists and is APPROVED
+      // 1. Verify leader exists and is APPROVED (or eligible in beta)
       const leader = await tx.user.findUnique({
         where: { id: leaderId }
       })
 
-      if (!leader || leader.verificationStatus !== 'APPROVED') {
+      if (!leader || !isUserEligibleForCoreFeatures(leader.verificationStatus)) {
         throw new Error('Only approved verified users can create teams.')
       }
 
@@ -141,9 +142,9 @@ export async function createTeamWithRoles(input: {
 
   try {
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Verify user is APPROVED
+      // 1. Verify user is APPROVED (or eligible in beta)
       const user = await tx.user.findUnique({ where: { id: leaderId } })
-      if (!user || user.verificationStatus !== 'APPROVED') {
+      if (!user || !isUserEligibleForCoreFeatures(user.verificationStatus)) {
         throw new Error('Only approved verified users can create teams.')
       }
 

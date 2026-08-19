@@ -4,6 +4,7 @@ import * as React from "react"
 import { Navbar, type UserSession } from "@/components/layout/navbar"
 import { Sidebar } from "@/components/layout/sidebar"
 import { cn } from "@/lib/utils"
+import { isUserEligibleForCoreFeatures } from "@/lib/policies"
 
 interface AppShellProps {
   children: React.ReactNode
@@ -20,7 +21,7 @@ export function AppShell({
   showSidebar = true,
   className,
 }: AppShellProps) {
-  const isVerified = user?.verificationStatus === "APPROVED"
+  const isVerified = isUserEligibleForCoreFeatures(user?.verificationStatus)
 
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">

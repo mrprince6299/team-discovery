@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { GlobalSearchDialog } from "@/components/search/global-search-dialog"
 import { cn } from "@/lib/utils"
+import { isUserEligibleForCoreFeatures } from "@/lib/policies"
 
 interface MobileNavProps {
   user?: {
@@ -61,7 +62,7 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
     },
   ]
 
-  const isVerified = user?.verificationStatus === "APPROVED"
+  const isVerified = isUserEligibleForCoreFeatures(user?.verificationStatus)
 
   return (
     <>

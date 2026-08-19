@@ -17,8 +17,11 @@ import { type TeamRoleDetails } from "./role-card"
 import { DeleteRoleDialog } from "./delete-role-dialog"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
-import { Loader2, Plus, Check, Trash2 } from "lucide-react"
+import { Loader2, Check, Trash2 } from "lucide-react"
 import type { PreferredExperience } from "@prisma/client"
+import { RoleCombobox } from "@/components/common/role-combobox"
+import { SearchableSkillSelector } from "@/components/common/searchable-skill-selector"
+import { EXPERIENCE_LEVEL_OPTIONS } from "@/lib/constants/options"
 
 interface RoleManagementDialogProps {
   teamId: string
@@ -58,28 +61,10 @@ function RoleManagementForm({
   const [preferredSkillNames, setPreferredSkillNames] = useState<string[]>(
     role?.preferredSkills.map((s) => s.name) || []
   )
-  const [skillInput, setSkillInput] = useState("")
   const [isPreferred, setIsPreferred] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const isVacant = isEditing && role && role.remainingSeats === role.seatsRequired
-
-  const handleAddSkill = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!skillInput.trim()) return
-
-    const trimmed = skillInput.trim()
-    if (isPreferred) {
-      if (!preferredSkillNames.includes(trimmed) && !requiredSkillNames.includes(trimmed)) {
-        setPreferredSkillNames([...preferredSkillNames, trimmed])
-      }
-    } else {
-      if (!requiredSkillNames.includes(trimmed) && !preferredSkillNames.includes(trimmed)) {
-        setRequiredSkillNames([...requiredSkillNames, trimmed])
-      }
-    }
-    setSkillInput("")
-  }
 
   const handleRemoveSkill = (skillName: string, isPref: boolean) => {
     if (isPref) {
@@ -182,13 +167,16 @@ function RoleManagementForm({
           <label className="text-xs font-semibold">
             Role Title <span className="text-destructive">*</span>
           </label>
-          <Input
+          <RoleCombobox
             value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Lead Backend Engineer, UI/UX Designer"
-            className="text-xs h-9"
-            required
+            onChange={(val, suggestedSkills) => {
+              setName(val)
+              if (suggestedSkills && suggestedSkills.length > 0) {
+                setRequiredSkillNames((prev) => Array.from(new Set([...prev, ...suggestedSkills])))
+              }
+            }}
             disabled={isSubmitting}
+            placeholder="e.g. Lead Frontend Engineer, AI / ML Specialist..."
           />
         </div>
 
@@ -216,10 +204,11 @@ function RoleManagementForm({
               className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-xs shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring"
               disabled={isSubmitting}
             >
-              <option value="ANY">Any Experience Level</option>
-              <option value="BEGINNER">Beginner (Foundational)</option>
-              <option value="SOME_EXPERIENCE">Intermediate (1+ Project)</option>
-              <option value="EXPERIENCED">Experienced (2+ Projects)</option>
+              {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -245,67 +234,79 @@ function RoleManagementForm({
         {/* Skills Configuration */}
         <div className="space-y-3 pt-1 border-t border-border/60">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-semibold">Candidate Matching Skills</label>
+            <label className="text-xs font-semibold">Candidate Matching Skills *</label>
             <span className="text-[11px] text-muted-foreground">
               {requiredSkillNames.length} Required · {preferredSkillNames.length} Preferred
             </span>
           </div>
 
-          {/* Add Skill Input */}
-          <div className="flex items-center gap-2">
-            <Input
-              value={skillInput}
-              onChange={(e) => setSkillInput(e.target.value)}
-              placeholder="Type skill name (e.g. Next.js, PyTorch)..."
-              className="text-xs h-9 flex-1"
-              disabled={isSubmitting}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault()
-                  handleAddSkill(e)
-                }
-              }}
-            />
-            <Button
+          {/* Mode Switcher */}
+          <div className="flex items-center gap-2 text-xs">
+            <button
               type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleAddSkill}
-              disabled={isSubmitting || !skillInput.trim()}
-              className="h-9 text-xs px-2.5 gap-1"
+              onClick={() => setIsPreferred(false)}
+              className={`px-3 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                !isPreferred
+                  ? "bg-emerald-500/15 border-emerald-500 text-emerald-700 dark:text-emerald-300"
+                  : "bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground"
+              }`}
             >
-              <Plus className="size-3.5" />
-              <span>Add</span>
-            </Button>
+              Required Skills ({requiredSkillNames.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsPreferred(true)}
+              className={`px-3 py-1 rounded-lg border font-semibold transition-colors cursor-pointer ${
+                isPreferred
+                  ? "bg-primary/15 border-primary text-primary font-bold"
+                  : "bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Preferred Skills ({preferredSkillNames.length})
+            </button>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <label className="flex items-center gap-1.5 cursor-pointer select-none">
-              <input
-                type="radio"
-                name="skillType"
-                checked={!isPreferred}
-                onChange={() => setIsPreferred(false)}
-                className="text-primary focus:ring-primary h-3.5 w-3.5"
-              />
-              <span className="font-semibold text-foreground">Required Skill (Exact Match)</span>
-            </label>
-            <label className="flex items-center gap-1.5 cursor-pointer select-none ml-2">
-              <input
-                type="radio"
-                name="skillType"
-                checked={isPreferred}
-                onChange={() => setIsPreferred(true)}
-                className="text-primary focus:ring-primary h-3.5 w-3.5"
-              />
-              <span className="text-muted-foreground">Preferred (Nice to have)</span>
-            </label>
-          </div>
+          {/* Searchable Skill Selector */}
+          <SearchableSkillSelector
+            availableSkills={availableSkills}
+            selectedSkillIds={isPreferred ? preferredSkillNames : requiredSkillNames}
+            onSelectSkill={(skill) => {
+              if (isPreferred) {
+                if (!preferredSkillNames.includes(skill.name) && !requiredSkillNames.includes(skill.name)) {
+                  setPreferredSkillNames([...preferredSkillNames, skill.name])
+                }
+              } else {
+                if (!requiredSkillNames.includes(skill.name) && !preferredSkillNames.includes(skill.name)) {
+                  setRequiredSkillNames([...requiredSkillNames, skill.name])
+                }
+              }
+            }}
+            onRemoveSkill={(id) => {
+              const skillName = availableSkills.find((s) => s.id === id)?.name || id
+              handleRemoveSkill(skillName, isPreferred)
+            }}
+            onAddCustomSkill={(customName) => {
+              if (isPreferred) {
+                if (!preferredSkillNames.includes(customName)) {
+                  setPreferredSkillNames([...preferredSkillNames, customName])
+                }
+              } else {
+                if (!requiredSkillNames.includes(customName)) {
+                  setRequiredSkillNames([...requiredSkillNames, customName])
+                }
+              }
+            }}
+            placeholder={
+              isPreferred
+                ? "Search preferred skills (nice-to-have)..."
+                : "Search required skills (strictly enforced for exact matching)..."
+            }
+          />
 
           {/* Required Skills Chips */}
           <div className="space-y-1">
             <div className="text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-              Required Skills (Strictly Enforced):
+              Required Skills (Exact Match Enforced):
             </div>
             <div className="flex flex-wrap gap-1.5">
               {requiredSkillNames.map((s) => (

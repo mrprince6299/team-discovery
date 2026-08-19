@@ -59,6 +59,14 @@ import {
 } from "@/components/ui/select"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
+import { SearchableSkillSelector } from "@/components/common/searchable-skill-selector"
+import {
+  AUTHORITATIVE_INTERESTS,
+  ACADEMIC_YEAR_OPTIONS,
+  AVAILABILITY_OPTIONS,
+  SKILL_LEVEL_OPTIONS,
+  AUTHORITATIVE_DEPARTMENTS,
+} from "@/lib/constants/options"
 
 interface ProfileEditorClientProps {
   initialProfile: {
@@ -204,16 +212,15 @@ export function ProfileEditorClient({
         toast.error(res.error)
       } else {
         toast.success("Skill added to profile!")
-        const skillObj = availableSkills.find((s) => s.id === selectedSkillId)
-        if (skillObj) {
-          setProfile((prev) => ({
-            ...prev,
-            skills: [
-              ...prev.skills.filter((s) => s.skill.id !== selectedSkillId),
-              { level: selectedSkillLevel, skill: skillObj },
-            ],
-          }))
-        }
+        const skillName = availableSkills.find((s) => s.id === selectedSkillId)?.name || selectedSkillId
+        const newId = res.skillId || selectedSkillId
+        setProfile((prev) => ({
+          ...prev,
+          skills: [
+            ...prev.skills.filter((s) => s.skill.name.toLowerCase() !== skillName.toLowerCase()),
+            { level: selectedSkillLevel, skill: { id: newId, name: skillName } },
+          ],
+        }))
         setIsAddSkillOpen(false)
         setSelectedSkillId("")
       }
@@ -239,7 +246,7 @@ export function ProfileEditorClient({
   // 4. Add Interest Submit
   const handleAddInterest = () => {
     if (!selectedInterestSkillId) {
-      toast.error("Please select an interest")
+      toast.error("Please select or type an interest")
       return
     }
 
@@ -248,17 +255,16 @@ export function ProfileEditorClient({
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Interest added!")
-        const skillObj = availableSkills.find((s) => s.id === selectedInterestSkillId)
-        if (skillObj) {
-          setProfile((prev) => ({
-            ...prev,
-            interests: [
-              ...prev.interests.filter((i) => i.skill.id !== selectedInterestSkillId),
-              { skill: skillObj },
-            ],
-          }))
-        }
+        toast.success("Domain interest added!")
+        const interestName = availableSkills.find((s) => s.id === selectedInterestSkillId)?.name || selectedInterestSkillId
+        const newId = res.skillId || selectedInterestSkillId
+        setProfile((prev) => ({
+          ...prev,
+          interests: [
+            ...prev.interests.filter((i) => i.skill.name.toLowerCase() !== interestName.toLowerCase()),
+            { skill: { id: newId, name: interestName } },
+          ],
+        }))
         setIsAddInterestOpen(false)
         setSelectedInterestSkillId("")
       }
@@ -604,10 +610,11 @@ export function ProfileEditorClient({
                       <SelectValue placeholder="Select availability" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="AVAILABLE">Available</SelectItem>
-                      <SelectItem value="LOOKING_FOR_TEAM">Looking For Team</SelectItem>
-                      <SelectItem value="BUSY">Busy</SelectItem>
-                      <SelectItem value="TEAM_FULL">Team Full</SelectItem>
+                      {AVAILABILITY_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -626,11 +633,11 @@ export function ProfileEditorClient({
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="1">Year 1 (Freshman)</SelectItem>
-                      <SelectItem value="2">Year 2 (Sophomore)</SelectItem>
-                      <SelectItem value="3">Year 3 (Junior)</SelectItem>
-                      <SelectItem value="4">Year 4 (Senior)</SelectItem>
-                      <SelectItem value="5">Year 5 / Graduate</SelectItem>
+                      {ACADEMIC_YEAR_OPTIONS.map((opt) => (
+                        <SelectItem key={opt.value} value={String(opt.value)}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -649,7 +656,7 @@ export function ProfileEditorClient({
                     disabled={isPending}
                   >
                     <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select college" />
+                      <SelectValue placeholder="Select college..." />
                     </SelectTrigger>
                     <SelectContent>
                       {colleges.map((c) => (
@@ -663,29 +670,33 @@ export function ProfileEditorClient({
               </div>
 
               {/* Department Selector */}
-              {departments.length > 0 && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Department / Major
-                  </label>
-                  <Select
-                    value={departmentId}
-                    onValueChange={(val) => setDepartmentId(val)}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((d) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <div className="space-y-1.5 pt-1">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Department / Major
+                </label>
+                <Select
+                  value={departmentId}
+                  onValueChange={(val) => setDepartmentId(val)}
+                  disabled={isPending}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select department / branch..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.length > 0
+                      ? departments.map((d) => (
+                          <SelectItem key={d.id} value={d.id}>
+                            {d.name}
+                          </SelectItem>
+                        ))
+                      : AUTHORITATIVE_DEPARTMENTS.map((d) => (
+                          <SelectItem key={d.code} value={d.name}>
+                            {d.name} ({d.code})
+                          </SelectItem>
+                        ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
             <CardFooter className="flex justify-end pt-2 border-t border-border/60">
               <Button
@@ -729,37 +740,37 @@ export function ProfileEditorClient({
                     <span>Add Skill</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-md sm:max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Add Technical Skill</DialogTitle>
                     <DialogDescription className="text-xs">
-                      Select a standardized skill and declare your proficiency level.
+                      Search and select from 80+ standardized engineering and design skills, or add a custom skill.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Select Skill
+                        Select Skill *
                       </label>
-                      <Select value={selectedSkillId} onValueChange={setSelectedSkillId}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Choose skill..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableSkills
-                            .filter((s) => !profile.skills.some((us) => us.skill.id === s.id))
-                            .map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                {s.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                      <SearchableSkillSelector
+                        availableSkills={availableSkills}
+                        selectedSkillIds={selectedSkillId ? [selectedSkillId] : []}
+                        onSelectSkill={(skill) => setSelectedSkillId(skill.id.startsWith('auth-') ? skill.name : skill.id)}
+                        onAddCustomSkill={(customName) => setSelectedSkillId(customName)}
+                        maxSelected={1}
+                        placeholder="Search skills (e.g. React, Python, Docker, Figma)..."
+                      />
+                      {selectedSkillId && (
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
+                          <span className="font-semibold text-foreground">Selected:</span>
+                          <Badge variant="exact" className="text-xs font-bold">{selectedSkillId}</Badge>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 pt-2 border-t border-border/60">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Proficiency Level
+                        Proficiency Level *
                       </label>
                       <Select
                         value={selectedSkillLevel}
@@ -769,9 +780,14 @@ export function ProfileEditorClient({
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="BEGINNER">Beginner (Familiar / Coursework)</SelectItem>
-                          <SelectItem value="INTERMEDIATE">Intermediate (Built 1-2 projects)</SelectItem>
-                          <SelectItem value="ADVANCED">Advanced (Production / Hackathon Winner)</SelectItem>
+                          {SKILL_LEVEL_OPTIONS.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>
+                              <div className="flex flex-col text-left py-0.5">
+                                <span className="font-semibold text-foreground">{opt.label}</span>
+                                <span className="text-[11px] text-muted-foreground">{opt.description}</span>
+                              </div>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -855,35 +871,51 @@ export function ProfileEditorClient({
                     <span>Add Interest</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-md sm:max-w-lg">
                   <DialogHeader>
                     <DialogTitle>Add Domain Interest</DialogTitle>
                     <DialogDescription className="text-xs">
-                      Select a field or technology you are interested in exploring.
+                      Select project and hackathon domains you want to explore.
                     </DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Select Interest
+                        Select Standard Domain
                       </label>
-                      <Select
+                      <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto p-2 border border-border/80 rounded-xl bg-muted/20">
+                        {AUTHORITATIVE_INTERESTS.filter(
+                          (interest) => !profile.interests.some((ui) => ui.skill.name.toLowerCase() === interest.toLowerCase())
+                        ).map((interest) => (
+                          <button
+                            key={interest}
+                            type="button"
+                            onClick={() => setSelectedInterestSkillId(interest)}
+                            className={`flex items-center justify-between p-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
+                              selectedInterestSkillId === interest
+                                ? "bg-primary/15 border-primary text-foreground font-bold shadow-2xs"
+                                : "bg-card border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <span className="truncate">{interest}</span>
+                            {selectedInterestSkillId === interest && (
+                              <CheckCircle2 className="size-3.5 text-primary shrink-0" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5 pt-2 border-t border-border/60">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Or Type Custom Domain
+                      </label>
+                      <Input
                         value={selectedInterestSkillId}
-                        onValueChange={setSelectedInterestSkillId}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Choose technology or topic..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableSkills
-                            .filter((s) => !profile.interests.some((ui) => ui.skill.id === s.id))
-                            .map((s) => (
-                              <SelectItem key={s.id} value={s.id}>
-                                {s.name}
-                              </SelectItem>
-                            ))}
-                        </SelectContent>
-                      </Select>
+                        onChange={(e) => setSelectedInterestSkillId(e.target.value)}
+                        placeholder="e.g. Quantum Computing, BioTech, Agritech..."
+                        className="text-xs h-9"
+                      />
                     </div>
                   </div>
                   <DialogFooter>
@@ -1046,29 +1078,22 @@ export function ProfileEditorClient({
                     {/* Skill Tags */}
                     <div className="space-y-1.5 pt-1">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Associated Skills
+                        Associated Tech Stack &amp; Skills ({projectSelectedSkillIds.length} tagged)
                       </label>
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 border border-border rounded-lg bg-muted/20">
-                        {availableSkills.map((skill) => {
-                          const isSelected = projectSelectedSkillIds.includes(skill.id)
-                          return (
-                            <Badge
-                              key={skill.id}
-                              variant={isSelected ? "exact" : "outline"}
-                              className="cursor-pointer text-xs"
-                              onClick={() => {
-                                setProjectSelectedSkillIds((prev) =>
-                                  isSelected
-                                    ? prev.filter((id) => id !== skill.id)
-                                    : [...prev, skill.id]
-                                )
-                              }}
-                            >
-                              {skill.name}
-                            </Badge>
-                          )
-                        })}
-                      </div>
+                      <SearchableSkillSelector
+                        availableSkills={availableSkills}
+                        selectedSkillIds={projectSelectedSkillIds}
+                        onSelectSkill={(skill) => {
+                          const id = skill.id.startsWith('auth-') ? skill.name : skill.id
+                          if (!projectSelectedSkillIds.includes(id)) {
+                            setProjectSelectedSkillIds([...projectSelectedSkillIds, id])
+                          }
+                        }}
+                        onRemoveSkill={(id) => {
+                          setProjectSelectedSkillIds(projectSelectedSkillIds.filter((sid) => sid !== id))
+                        }}
+                        placeholder="Tag project tech stack (e.g. React, Node.js, Tailwind, Docker)..."
+                      />
                     </div>
 
                     {/* Privacy Checkbox */}

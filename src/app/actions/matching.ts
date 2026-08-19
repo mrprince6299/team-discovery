@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
+import { REQUIRE_INSTITUTIONAL_VERIFICATION } from '@/lib/policies'
 
 async function getAuthUserId(): Promise<string | null> {
   try {
@@ -136,10 +137,10 @@ export async function getMatchedCandidatesForRole(roleId: string) {
     .filter((rs) => rs.requirementType === 'REQUIRED')
     .map((rs) => rs.skillId)
 
-  // 2. Fetch all candidates who are APPROVED, not TEAM_FULL
+  // 2. Fetch all candidates (in beta, includes all active candidates; in strict mode, APPROVED only)
   const rawCandidates = await prisma.user.findMany({
     where: {
-      verificationStatus: 'APPROVED',
+      ...(REQUIRE_INSTITUTIONAL_VERIFICATION ? { verificationStatus: 'APPROVED' } : {}),
       availability: { not: 'TEAM_FULL' },
       // Exclude those already in the team or with pending/accepted application for this team
       teamMemberships: { none: { teamId: role.teamId, status: 'ACTIVE' } },

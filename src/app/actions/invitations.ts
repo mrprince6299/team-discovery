@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 import { createInternalNotification } from './notifications'
+import { isUserEligibleForCoreFeatures } from '@/lib/policies'
 
 async function getAuthUserId(providedUserId?: string): Promise<string | null> {
   if (providedUserId && process.env.NODE_ENV !== 'production') {
@@ -48,12 +49,12 @@ export async function createInvitation(input: {
       return { error: 'Unauthorized: Only team leaders can send invitations.' }
     }
 
-    // 2. Verify recipient is APPROVED
+    // 2. Verify recipient is APPROVED (or eligible in beta)
     const recipient = await prisma.user.findUnique({
       where: { id: input.recipientId }
     })
 
-    if (!recipient || recipient.verificationStatus !== 'APPROVED') {
+    if (!recipient || !isUserEligibleForCoreFeatures(recipient.verificationStatus)) {
       return { error: 'Recipient is not an approved verified user.' }
     }
 

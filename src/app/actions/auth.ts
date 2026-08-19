@@ -20,6 +20,9 @@ export async function login(formData: FormData) {
   })
 
   if (error) {
+    if (error.message.toLowerCase().includes('email not confirmed')) {
+      redirect(`/verify?email=${encodeURIComponent(email)}`)
+    }
     return { error: error.message }
   }
 
@@ -38,7 +41,7 @@ export async function signup(formData: FormData) {
 
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -52,8 +55,32 @@ export async function signup(formData: FormData) {
     return { error: error.message }
   }
 
+  // If Supabase created user but requires email verification (no active session yet)
+  if (data.user && !data.session) {
+    revalidatePath('/', 'layout')
+    redirect(`/verify?email=${encodeURIComponent(email)}`)
+  }
+
   revalidatePath('/', 'layout')
-  redirect('/verify') // Send them to a pending verification state or login screen
+  redirect('/dashboard') // Send them directly to dashboard for beta access
+}
+
+export async function resendVerificationEmail(email: string) {
+  if (!email || !email.trim()) {
+    return { error: 'Email address is required to resend verification link.' }
+  }
+
+  const supabase = await createClient()
+  const { error } = await supabase.auth.resend({
+    type: 'signup',
+    email: email.trim(),
+  })
+
+  if (error) {
+    return { error: error.message }
+  }
+
+  return { success: true }
 }
 
 export async function logout() {

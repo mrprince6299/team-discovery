@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
 import { createInternalNotification } from './notifications'
+import { isUserEligibleForCoreFeatures } from '@/lib/policies'
 
 async function getAuthUserId(providedUserId?: string): Promise<string | null> {
   if (providedUserId && process.env.NODE_ENV !== 'production') {
@@ -41,7 +42,7 @@ export async function createApplication(input: {
       return { error: 'User not found.' }
     }
 
-    if (user.verificationStatus !== 'APPROVED') {
+    if (!isUserEligibleForCoreFeatures(user.verificationStatus)) {
       return { error: 'You must have an APPROVED college verification to apply to teams.' }
     }
 

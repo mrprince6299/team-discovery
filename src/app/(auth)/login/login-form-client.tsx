@@ -49,7 +49,20 @@ export function LoginFormClient() {
                 className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-medium"
               >
                 <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                <span>{state.error}</span>
+                <div className="space-y-1">
+                  <span>{state.error}</span>
+                  {state.error.toLowerCase().includes('email not confirmed') && (
+                    <div>
+                      <Link
+                        href="/verify"
+                        className="font-semibold underline underline-offset-2 hover:text-foreground inline-flex items-center gap-1 mt-0.5"
+                      >
+                        <span>Resend verification email</span>
+                        <span>&rarr;</span>
+                      </Link>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

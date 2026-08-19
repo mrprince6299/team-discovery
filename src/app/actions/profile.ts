@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { Availability, SkillLevel } from '@prisma/client'
+import { AUTHORITATIVE_SKILLS } from '@/lib/constants/options'
 
 async function getAuthenticatedUser() {
   const supabase = await createClient()
@@ -242,9 +243,63 @@ export async function updateBasicProfile(data: {
 }
 
 export async function getAllAvailableSkills() {
-  return await prisma.skill.findMany({
-    orderBy: { name: 'asc' },
-  })
+  try {
+    const existing = await prisma.skill.findMany({
+      where: { isCustom: false },
+      orderBy: { name: 'asc' },
+    })
+
+    // If database skills are sparse, sync authoritative skills
+    const existingNames = new Set(existing.map((s) => s.name.toLowerCase()))
+    const missing = AUTHORITATIVE_SKILLS.filter(
+      (auth) => !existingNames.has(auth.name.toLowerCase())
+    )
+
+    if (missing.length > 0) {
+      await prisma.skill.createMany({
+        data: missing.map((m) => ({
+          name: m.name,
+          isCustom: false,
+        })),
+        skipDuplicates: true,
+      })
+
+      return await prisma.skill.findMany({
+        where: { isCustom: false },
+        orderBy: { name: 'asc' },
+      })
+    }
+
+    return existing
+  } catch {
+    return AUTHORITATIVE_SKILLS.map((s, idx) => ({
+      id: `fallback-${idx}`,
+      name: s.name,
+      isCustom: false,
+    }))
+  }
+}
+
+export async function ensureSkillByName(name: string): Promise<{ id: string; name: string } | null> {
+  const trimmed = name.trim()
+  if (!trimmed) return null
+
+  try {
+    const existing = await prisma.skill.findFirst({
+      where: { name: { equals: trimmed, mode: 'insensitive' } },
+    })
+    if (existing) return existing
+
+    const created = await prisma.skill.create({
+      data: {
+        name: trimmed,
+        isCustom: true,
+      },
+    })
+    return created
+  } catch {
+    return null
+  }
 }
 
 export async function getAllCollegesAndDepartments() {
@@ -259,32 +314,45 @@ export async function getAllCollegesAndDepartments() {
   return colleges
 }
 
-export async function addUserSkill(skillId: string, level: SkillLevel) {
+export async function addUserSkill(skillIdOrName: string, level: SkillLevel) {
   const authUser = await getAuthenticatedUser()
 
-  if (!skillId || !level) {
+  if (!skillIdOrName || !level) {
     return { error: 'Skill and level are required' }
   }
 
   try {
+    let resolvedSkillId = skillIdOrName
+    if (skillIdOrName.startsWith('auth-') || skillIdOrName.startsWith('custom-')) {
+      const rawName = skillIdOrName.replace(/^(auth|custom)-/, '')
+      const ensured = await ensureSkillByName(rawName)
+      if (ensured) resolvedSkillId = ensured.id
+    } else {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skillIdOrName)
+      if (!isUuid) {
+        const ensured = await ensureSkillByName(skillIdOrName)
+        if (ensured) resolvedSkillId = ensured.id
+      }
+    }
+
     await prisma.userSkill.upsert({
       where: {
         userId_skillId: {
           userId: authUser.id,
-          skillId,
+          skillId: resolvedSkillId,
         },
       },
       update: { level },
       create: {
         userId: authUser.id,
-        skillId,
+        skillId: resolvedSkillId,
         level,
       },
     })
 
     revalidatePath('/profile')
     revalidatePath(`/users/${authUser.id}`)
-    return { success: true }
+    return { success: true, skillId: resolvedSkillId }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to add skill' }
   }
@@ -309,31 +377,39 @@ export async function removeUserSkill(skillId: string) {
   }
 }
 
-export async function addUserInterest(skillId: string) {
+export async function addUserInterest(skillIdOrName: string) {
   const authUser = await getAuthenticatedUser()
 
-  if (!skillId) {
-    return { error: 'Skill is required' }
+  if (!skillIdOrName) {
+    return { error: 'Interest is required' }
   }
 
   try {
+    let resolvedSkillId = skillIdOrName
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skillIdOrName)
+    if (skillIdOrName.startsWith('auth-') || skillIdOrName.startsWith('custom-') || !isUuid) {
+      const rawName = skillIdOrName.replace(/^(auth|custom)-/, '')
+      const ensured = await ensureSkillByName(rawName)
+      if (ensured) resolvedSkillId = ensured.id
+    }
+
     await prisma.userInterest.upsert({
       where: {
         userId_skillId: {
           userId: authUser.id,
-          skillId,
+          skillId: resolvedSkillId,
         },
       },
       update: {},
       create: {
         userId: authUser.id,
-        skillId,
+        skillId: resolvedSkillId,
       },
     })
 
     revalidatePath('/profile')
     revalidatePath(`/users/${authUser.id}`)
-    return { success: true }
+    return { success: true, skillId: resolvedSkillId }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to add interest' }
   }

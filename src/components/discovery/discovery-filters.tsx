@@ -11,6 +11,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import {
+  ACADEMIC_YEAR_OPTIONS,
+  AVAILABILITY_OPTIONS,
+  EXPERIENCE_LEVEL_OPTIONS,
+  AUTHORITATIVE_DEPARTMENTS,
+} from "@/lib/constants/options"
 
 export interface FilterState {
   departmentId: string
@@ -35,6 +41,22 @@ export function DiscoveryFilters({
   totalResultsCount,
 }: DiscoveryFiltersProps) {
   const activeCount = Object.values(filters).filter((v) => v !== "ALL" && v !== "").length
+
+  // Merge database departments with authoritative department list for comprehensive coverage
+  const allDepartments = React.useMemo(() => {
+    const list = [...departments]
+    const existingNames = new Set(list.map((d) => d.name.toLowerCase()))
+
+    AUTHORITATIVE_DEPARTMENTS.forEach((authDept) => {
+      if (!existingNames.has(authDept.name.toLowerCase())) {
+        list.push({
+          id: authDept.code,
+          name: authDept.name,
+        })
+      }
+    })
+    return list
+  }, [departments])
 
   return (
     <div className="rounded-xl border border-border/80 bg-card p-4 shadow-xs space-y-3">
@@ -71,7 +93,7 @@ export function DiscoveryFilters({
         {/* Department Filter */}
         <div className="space-y-1">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Department
+            Department / Major
           </label>
           <Select
             value={filters.departmentId}
@@ -80,9 +102,9 @@ export function DiscoveryFilters({
             <SelectTrigger className="h-9 text-xs">
               <SelectValue placeholder="All Departments" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-60">
               <SelectItem value="ALL">All Departments</SelectItem>
-              {departments.map((dept) => (
+              {allDepartments.map((dept) => (
                 <SelectItem key={dept.id} value={dept.id}>
                   {dept.name}
                 </SelectItem>
@@ -105,11 +127,11 @@ export function DiscoveryFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">All Years</SelectItem>
-              <SelectItem value="1">Year 1 (Freshman)</SelectItem>
-              <SelectItem value="2">Year 2 (Sophomore)</SelectItem>
-              <SelectItem value="3">Year 3 (Junior)</SelectItem>
-              <SelectItem value="4">Year 4 (Senior)</SelectItem>
-              <SelectItem value="5">Year 5 / Graduate</SelectItem>
+              {ACADEMIC_YEAR_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={String(opt.value)}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -128,9 +150,11 @@ export function DiscoveryFilters({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Any Availability</SelectItem>
-              <SelectItem value="AVAILABLE">Available</SelectItem>
-              <SelectItem value="LOOKING_FOR_TEAM">Looking for Team</SelectItem>
-              <SelectItem value="BUSY">Busy</SelectItem>
+              {AVAILABILITY_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -138,7 +162,7 @@ export function DiscoveryFilters({
         {/* Minimum Experience Filter */}
         <div className="space-y-1">
           <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Min Experience
+            Min Experience Level
           </label>
           <Select
             value={filters.minExperience}
@@ -148,10 +172,11 @@ export function DiscoveryFilters({
               <SelectValue placeholder="Any Experience" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="ALL">Any Experience</SelectItem>
-              <SelectItem value="BEGINNER">Beginner+</SelectItem>
-              <SelectItem value="SOME_EXPERIENCE">Some Experience (1+ Projects)</SelectItem>
-              <SelectItem value="EXPERIENCED">Experienced (2+ Projects)</SelectItem>
+              {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
