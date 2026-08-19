@@ -8,12 +8,19 @@ import {
   Star,
   Layers,
   Award,
+  LayoutDashboard,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { createClient } from "@/utils/supabase/server"
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
   return (
     <div className="flex min-h-screen flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground antialiased">
       {/* Top Navigation */}
@@ -37,12 +44,24 @@ export default function LandingPage() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="sm">
-              <Link href="/login">Sign In</Link>
-            </Button>
-            <Button asChild size="sm" className="shadow-xs">
-              <Link href="/signup">Get Started</Link>
-            </Button>
+            {user ? (
+              <Button asChild size="sm" className="shadow-xs gap-1.5">
+                <Link href="/dashboard">
+                  <LayoutDashboard className="size-3.5" />
+                  <span>Go to Dashboard</span>
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+            ) : (
+              <>
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/login">Sign In</Link>
+                </Button>
+                <Button asChild size="sm" className="shadow-xs">
+                  <Link href="/signup">Get Started</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -69,15 +88,31 @@ export default function LandingPage() {
 
                 {/* CTAs */}
                 <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 pt-2">
-                  <Button asChild size="lg" className="w-full sm:w-auto gap-2 text-base font-semibold shadow-md">
-                    <Link href="/signup">
-                      <span>Create Free Account</span>
-                      <ArrowRight className="size-4" />
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base">
-                    <Link href="/login">Sign In with College Email</Link>
-                  </Button>
+                  {user ? (
+                    <>
+                      <Button asChild size="lg" className="w-full sm:w-auto gap-2 text-base font-semibold shadow-md">
+                        <Link href="/dashboard">
+                          <span>Go to Dashboard</span>
+                          <ArrowRight className="size-4" />
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base">
+                        <Link href="/teams">Browse Squads</Link>
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button asChild size="lg" className="w-full sm:w-auto gap-2 text-base font-semibold shadow-md">
+                        <Link href="/signup">
+                          <span>Create Free Account</span>
+                          <ArrowRight className="size-4" />
+                        </Link>
+                      </Button>
+                      <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base">
+                        <Link href="/login">Sign In with College Email</Link>
+                      </Button>
+                    </>
+                  )}
                 </div>
 
                 {/* Key Indicators */}
@@ -373,15 +408,31 @@ export default function LandingPage() {
               Join students discovering teammates with exact skill matches, verified portfolios, and active availability.
             </p>
             <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button asChild size="lg" className="w-full sm:w-auto gap-2 text-base font-semibold shadow-md">
-                <Link href="/signup">
-                  <span>Sign Up Now</span>
-                  <ArrowRight className="size-4" />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base">
-                <Link href="/login">Sign In</Link>
-              </Button>
+              {user ? (
+                <>
+                  <Button asChild size="lg" className="w-full sm:w-auto gap-2 text-base font-semibold shadow-md">
+                    <Link href="/dashboard">
+                      <span>Go to Dashboard</span>
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base">
+                    <Link href="/teams">Browse Squads</Link>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button asChild size="lg" className="w-full sm:w-auto gap-2 text-base font-semibold shadow-md">
+                    <Link href="/signup">
+                      <span>Sign Up Now</span>
+                      <ArrowRight className="size-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="lg" className="w-full sm:w-auto text-base">
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </section>

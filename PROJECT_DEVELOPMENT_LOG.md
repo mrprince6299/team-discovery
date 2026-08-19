@@ -3,12 +3,12 @@
 **Do not rely on conversation history as the project's source of truth. PROJECT_DEVELOPMENT_LOG.md must remain the portable source of truth for development history and current implementation status.**
 
 ## Current State
-- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA GENERATION FIX: VERIFIED & PUSHED (COMMIT 3edcbc6); PLATFORM STATUS: VERCEL BUILD LIFECYCLE VERIFIED, GITHUB MAIN UPDATED, AWAITING VERCEL DEPLOYMENT & LIVE URL SMOKE TEST.
+- **Phase:** Phase 1: VERIFIED & COMPLETE; Phase 2: VERIFIED & COMPLETE; Phase 3: VERIFIED & COMPLETE; Phase 4 (Steps 1–8): VERIFIED & COMPLETE; Phase 5 (Steps 1–6): VERIFIED & COMPLETE; PHASE 1–5: VERIFIED & COMPLETE; PRODUCTION READINESS (Steps 1–3): VERIFIED & COMPLETE; PRODUCTION DEPLOYMENT (Steps 4A–4C): VERIFIED & COMPLETE; HOSTED DATABASE MIGRATION: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); AUTH NAVIGATION FIX: VERIFIED & APPLIED; PLATFORM STATUS: PRODUCTION AUTH FLOW HARDENED, GITHUB MAIN UPDATED.
 - **Framework:** Next.js 16 (App Router), TypeScript, Tailwind CSS v4, shadcn/ui.
 - **Database:** PostgreSQL (29 models, 14 enums, 3 migrations applied, 0 schema drift, RLS enabled on 27 domain tables, triggers and partial indexes active).
 - **ORM:** Prisma 7 (`@prisma/client`, `@prisma/adapter-pg`).
 - **Authentication/Realtime:** Supabase (SSR client configured, Server Actions, Server-Driven In-App Notifications).
-- **Status:** Vercel build failure #2 resolved. Diagnosed root cause: `package.json` build script was `"next build"`, which ran in Vercel's clean build environment without executing `prisma generate` first, causing missing `@prisma/client` export typecheck errors during Next.js production build. Updated `package.json` build script to `"prisma generate && next build"` and added `"postinstall": "prisma generate"`. Verified `npx prisma generate` (288ms), `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors), `npm run build` (19 routes compiled), and 13 integration test suites (315/315 passed). Committed fix (`3edcbc6`) and pushed to `origin/main`. Report `VERCEL_BUILD_FAILURE_2_PRISMA_GENERATION_FIX_REPORT.md` published.
+- **Status:** Production authentication navigation flow hardened. Updated `login()` Server Action to redirect directly to `/dashboard`. Converted `src/app/page.tsx` into a session-aware Server Component displaying "Go to Dashboard" for authenticated users. Converted `/login` and `/signup` into Server Components with active session guards that immediately redirect authenticated users to `/dashboard`. Extracted client form interactions to `login-form-client.tsx` and `signup-form-client.tsx`. Verified with TypeScript compiler (0 errors), ESLint (0 errors), and Next.js production build (19 routes compiled).
 
 
 
@@ -1840,8 +1840,36 @@
   - `npm run build` (0 build errors, 19 routes).
   - 13 test suites (315/315 passed).
 - **Known issues:** None (0).
-- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); PRISMA GENERATION FIX: VERIFIED & PUSHED (COMMIT 3edcbc6); PLATFORM STATUS: VERCEL BUILD LIFECYCLE VERIFIED, GITHUB MAIN UPDATED, AWAITING VERCEL DEPLOYMENT & LIVE URL SMOKE TEST.
-- **Exact next planned step:** Trigger Vercel redeployment from updated `main` branch.
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); AUTH NAVIGATION FIX: VERIFIED & APPLIED; PLATFORM STATUS: PRODUCTION AUTH FLOW HARDENED, GITHUB MAIN UPDATED.
+
+### 2026-08-19 10:43 - Production Authentication Session & Navigation Flow Hardening
+- **Exact date/time:** 2026-08-19 10:43
+- **What was changed & verified:**
+  1. Updated `login()` in `src/app/actions/auth.ts`: redirected post-login destination from `/` to `/dashboard`.
+  2. Updated `src/app/page.tsx`: converted `LandingPage` to an async Server Component with `const { data: { user } } = await supabase.auth.getUser()`. Conditionally renders "Go to Dashboard" button in header, hero, and CTA banner when authenticated.
+  3. Updated `src/app/(auth)/login/page.tsx`: converted to Server Component checking for active session; redirects already authenticated users immediately to `/dashboard`. Extracted interactive login form to `src/app/(auth)/login/login-form-client.tsx`.
+  4. Updated `src/app/(auth)/signup/page.tsx`: converted to Server Component checking for active session; redirects already authenticated users immediately to `/dashboard`. Extracted interactive signup form to `src/app/(auth)/signup/signup-form-client.tsx`.
+  5. Ran TypeScript check: `npx tsc --noEmit` $\rightarrow$ `0 Errors`.
+  6. Ran ESLint audit: `npm run lint` $\rightarrow$ `0 Errors, 0 Warnings`.
+  7. Ran Next.js production build: `npm run build` $\rightarrow$ `Compiled successfully (19 production routes)`.
+- **Why it was changed:** Fix post-login navigation trapping users on public landing page and eliminate redundant sign-in loops.
+- **Files created:**
+  - `src/app/(auth)/login/login-form-client.tsx`
+  - `src/app/(auth)/signup/signup-form-client.tsx`
+- **Files modified:**
+  - `src/app/actions/auth.ts`
+  - `src/app/page.tsx`
+  - `src/app/(auth)/login/page.tsx`
+  - `src/app/(auth)/signup/page.tsx`
+  - `PROJECT_DEVELOPMENT_LOG.md`
+- **Tests / verification performed:**
+  - `npx tsc --noEmit` (0 errors).
+  - `npm run lint` (0 errors).
+  - `npm run build` (19 routes compiled).
+- **Known issues:** None (0).
+- **Current project status:** Phase 1–5: VERIFIED & COMPLETE; Production Readiness (Steps 1–3): VERIFIED & COMPLETE; Production Deployment (Steps 4A–4C): VERIFIED & COMPLETE; Hosted Database Migration: CORRECTED & VERIFIED (3/3 MIGRATIONS APPLIED TO SUPABASE PRODUCTION); AUTH NAVIGATION FIX: VERIFIED & APPLIED; PLATFORM STATUS: PRODUCTION AUTH FLOW HARDENED, GITHUB MAIN UPDATED.
+- **Exact next planned step:** Verify live behavior on deployed Vercel URL after auto-deployment.
+
 
 
 
