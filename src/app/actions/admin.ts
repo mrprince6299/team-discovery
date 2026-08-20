@@ -1,6 +1,7 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
+import { revalidatePath } from 'next/cache'
 import { isCurrentUserAdmin } from '@/app/actions/verification'
 import {
   AUTHORITATIVE_SKILLS,
@@ -21,9 +22,10 @@ export async function getAdminDashboardOverview() {
   }
 
   const [
-    totalUsers,
+    totalStudents,
+    totalAdmins,
     pendingVerification,
-    verifiedUsers,
+    verifiedStudents,
     rejectedVerification,
     totalTeams,
     activeTeams,
@@ -31,15 +33,34 @@ export async function getAdminDashboardOverview() {
     pendingInvitations,
     recentRequests,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.verificationRequest.count({ where: { status: 'PENDING' } }),
-    prisma.user.count({ where: { verificationStatus: 'APPROVED' } }),
-    prisma.verificationRequest.count({ where: { status: 'REJECTED' } }),
+    prisma.user.count({ where: { roles: { none: { role: 'ADMIN' } } } }),
+    prisma.userRole.count({ where: { role: 'ADMIN' } }),
+    prisma.verificationRequest.count({
+      where: {
+        status: 'PENDING',
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
+    }),
+    prisma.user.count({
+      where: {
+        verificationStatus: 'APPROVED',
+        roles: { none: { role: 'ADMIN' } },
+      },
+    }),
+    prisma.verificationRequest.count({
+      where: {
+        status: 'REJECTED',
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
+    }),
     prisma.team.count(),
     prisma.team.count({ where: { status: 'ACTIVE' } }),
     prisma.application.count({ where: { status: 'PENDING' } }),
     prisma.invitation.count({ where: { status: 'PENDING' } }),
     prisma.verificationRequest.findMany({
+      where: {
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
       take: 6,
       orderBy: { updatedAt: 'desc' },
       include: {
@@ -59,9 +80,10 @@ export async function getAdminDashboardOverview() {
 
   return {
     metrics: {
-      totalUsers,
+      totalStudents,
+      totalAdmins,
       pendingVerification,
-      verifiedUsers,
+      verifiedStudents,
       rejectedVerification,
       totalTeams,
       activeTeams,
@@ -169,10 +191,11 @@ export async function getAdminUsersList() {
     }
   })
 
+  const nonAdminStudents = users.filter((u) => !u.isAdmin)
   const counts = {
-    total: users.length,
-    verified: users.filter((u) => u.verificationStatus === 'APPROVED').length,
-    pending: users.filter((u) => u.verificationStatus === 'PENDING').length,
+    totalStudents: nonAdminStudents.length,
+    verified: nonAdminStudents.filter((u) => u.verificationStatus === 'APPROVED').length,
+    pending: nonAdminStudents.filter((u) => u.verificationStatus === 'PENDING').length,
     admins: users.filter((u) => u.isAdmin).length,
   }
 
@@ -293,9 +316,10 @@ export async function getAdminAnalytics() {
   }
 
   const [
-    totalUsers,
-    verifiedUsers,
-    pendingUsers,
+    totalStudents,
+    totalAdmins,
+    verifiedStudents,
+    pendingStudents,
     totalTeams,
     activeTeams,
     fullTeams,
@@ -319,9 +343,20 @@ export async function getAdminAnalytics() {
     totalLinks,
     ratings,
   ] = await Promise.all([
-    prisma.user.count(),
-    prisma.user.count({ where: { verificationStatus: 'APPROVED' } }),
-    prisma.user.count({ where: { verificationStatus: 'PENDING' } }),
+    prisma.user.count({ where: { roles: { none: { role: 'ADMIN' } } } }),
+    prisma.userRole.count({ where: { role: 'ADMIN' } }),
+    prisma.user.count({
+      where: {
+        verificationStatus: 'APPROVED',
+        roles: { none: { role: 'ADMIN' } },
+      },
+    }),
+    prisma.user.count({
+      where: {
+        verificationStatus: 'PENDING',
+        roles: { none: { role: 'ADMIN' } },
+      },
+    }),
     prisma.team.count(),
     prisma.team.count({ where: { status: 'ACTIVE' } }),
     prisma.team.count({ where: { status: 'FULL' } }),
@@ -334,10 +369,29 @@ export async function getAdminAnalytics() {
     prisma.invitation.count(),
     prisma.invitation.count({ where: { status: 'ACCEPTED' } }),
     prisma.invitation.count({ where: { status: 'PENDING' } }),
-    prisma.verificationRequest.count(),
-    prisma.verificationRequest.count({ where: { status: 'APPROVED' } }),
-    prisma.verificationRequest.count({ where: { status: 'PENDING' } }),
-    prisma.verificationRequest.count({ where: { status: 'REJECTED' } }),
+    prisma.verificationRequest.count({
+      where: {
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
+    }),
+    prisma.verificationRequest.count({
+      where: {
+        status: 'APPROVED',
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
+    }),
+    prisma.verificationRequest.count({
+      where: {
+        status: 'PENDING',
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
+    }),
+    prisma.verificationRequest.count({
+      where: {
+        status: 'REJECTED',
+        user: { roles: { none: { role: 'ADMIN' } } },
+      },
+    }),
     prisma.notification.count(),
     prisma.notification.count({ where: { isRead: true } }),
     prisma.message.count(),
@@ -365,11 +419,15 @@ export async function getAdminAnalytics() {
 
   return {
     users: {
-      total: totalUsers,
-      verified: verifiedUsers,
-      pending: pendingUsers,
-      unverified: totalUsers - verifiedUsers,
-      verificationRate: totalUsers > 0 ? Math.round((verifiedUsers / totalUsers) * 100) : 0,
+      total: totalStudents,
+      totalStudents,
+      totalAdmins,
+      verified: verifiedStudents,
+      verifiedStudents,
+      pending: pendingStudents,
+      pendingStudents,
+      unverified: totalStudents - verifiedStudents,
+      verificationRate: totalStudents > 0 ? Math.round((verifiedStudents / totalStudents) * 100) : 0,
     },
     teams: {
       total: totalTeams,
@@ -424,6 +482,7 @@ export async function getAdminTaxonomy() {
     }),
     prisma.userSkill.groupBy({
       by: ['skillId'],
+      where: { user: { roles: { none: { role: 'ADMIN' } } } },
       _count: { userId: true },
     }),
     prisma.roleSkill.groupBy({
@@ -444,6 +503,11 @@ export async function getAdminTaxonomy() {
   }))
 
   const customSkills = skills.filter((s) => s.isCustom)
+
+  const dbCanonicalSkills = skills.filter((s) => !s.isCustom)
+  const canonicalNamesInDb = new Set(dbCanonicalSkills.map((s) => s.name.toLowerCase()))
+
+  // Build combined categories
   const categories: Record<string, string[]> = {}
   for (const item of AUTHORITATIVE_SKILLS) {
     if (!categories[item.category]) {
@@ -452,15 +516,32 @@ export async function getAdminTaxonomy() {
     categories[item.category].push(item.name)
   }
 
-  const canonicalSkills = AUTHORITATIVE_SKILLS.map((item) => {
-    const matched = skills.find((s) => s.name.toLowerCase() === item.name.toLowerCase())
+  // Canonical skills list combining database skills and authoritative catalog
+  const canonicalSkills = dbCanonicalSkills.map((s) => {
+    const authMatch = AUTHORITATIVE_SKILLS.find((a) => a.name.toLowerCase() === s.name.toLowerCase())
+    const category = authMatch?.category || 'Backend'
     return {
-      name: item.name,
-      category: item.category,
-      studentCount: matched?.studentCount || 0,
-      squadDemandCount: matched?.squadDemandCount || 0,
+      id: s.id,
+      name: s.name,
+      category,
+      studentCount: s.studentCount,
+      squadDemandCount: s.squadDemandCount,
     }
   })
+
+  // Add any authoritative skills not yet in DB
+  for (const auth of AUTHORITATIVE_SKILLS) {
+    if (!canonicalNamesInDb.has(auth.name.toLowerCase())) {
+      canonicalSkills.push({
+        id: 'auth-' + auth.name,
+        name: auth.name,
+        category: auth.category,
+        studentCount: 0,
+        squadDemandCount: 0,
+      })
+    }
+  }
+
 
   return {
     categories,
@@ -471,5 +552,172 @@ export async function getAdminTaxonomy() {
     canonicalDepartments: AUTHORITATIVE_DEPARTMENTS,
     totalSkillsCount: skills.length,
     customSkillsCount: customSkills.length,
+  }
+}
+
+
+// ============================================================================
+// ADMIN TAXONOMY MUTATION ACTIONS (ADMIN-ONLY)
+// ============================================================================
+
+/**
+ * Creates a new canonical or custom skill in the database
+ */
+export async function createAdminSkill(data: {
+  name: string
+  category?: string
+  isCustom?: boolean
+}): Promise<{ success?: boolean; error?: string; skill?: any }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  const name = data.name?.trim()
+  if (!name) {
+    return { error: 'Skill name is required.' }
+  }
+
+  try {
+    const existing = await prisma.skill.findFirst({
+      where: { name: { equals: name, mode: 'insensitive' } },
+    })
+
+    if (existing) {
+      if (existing.isCustom && data.isCustom === false) {
+        // Promote existing custom skill
+        const updated = await prisma.skill.update({
+          where: { id: existing.id },
+          data: { isCustom: false },
+        })
+        revalidatePath('/admin/taxonomy')
+        revalidatePath('/profile')
+        revalidatePath('/teams/create')
+        revalidatePath('/discover')
+        return { success: true, skill: updated }
+      }
+      return { error: `Skill "${name}" already exists in the database.` }
+    }
+
+    const created = await prisma.skill.create({
+      data: {
+        name,
+        isCustom: data.isCustom ?? false,
+      },
+    })
+
+    revalidatePath('/admin/taxonomy')
+    revalidatePath('/profile')
+    revalidatePath('/teams/create')
+    revalidatePath('/discover')
+
+    return { success: true, skill: created }
+  } catch (err: any) {
+    console.error('Error creating admin skill:', err)
+    return { error: err.message || 'Failed to create skill.' }
+  }
+}
+
+/**
+ * Updates or renames a skill
+ */
+export async function updateAdminSkill(
+  id: string,
+  data: { name?: string; isCustom?: boolean }
+): Promise<{ success?: boolean; error?: string }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  try {
+    const existing = await prisma.skill.findUnique({ where: { id } })
+    if (!existing) {
+      return { error: 'Skill not found.' }
+    }
+
+    const updateData: any = {}
+    if (data.name !== undefined && data.name.trim()) {
+      updateData.name = data.name.trim()
+    }
+    if (data.isCustom !== undefined) {
+      updateData.isCustom = data.isCustom
+    }
+
+    await prisma.skill.update({
+      where: { id },
+      data: updateData,
+    })
+
+    revalidatePath('/admin/taxonomy')
+    revalidatePath('/profile')
+    revalidatePath('/teams/create')
+    revalidatePath('/discover')
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Error updating admin skill:', err)
+    return { error: err.message || 'Failed to update skill.' }
+  }
+}
+
+/**
+ * Promotes a custom user-created skill to canonical
+ */
+export async function promoteCustomSkillToCanonical(
+  id: string
+): Promise<{ success?: boolean; error?: string }> {
+  return updateAdminSkill(id, { isCustom: false })
+}
+
+/**
+ * Deletes a skill if it has no active references
+ */
+export async function deleteAdminSkill(
+  id: string
+): Promise<{ success?: boolean; error?: string }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  try {
+    const skill = await prisma.skill.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            userSkills: true,
+            roleSkills: true,
+            projectSkills: true,
+          },
+        },
+      },
+    })
+
+    if (!skill) {
+      return { error: 'Skill not found.' }
+    }
+
+    const totalUsage =
+      skill._count.userSkills + skill._count.roleSkills + skill._count.projectSkills
+
+    if (totalUsage > 0) {
+      return {
+        error: `Cannot delete skill "${skill.name}" because it is actively used by ${totalUsage} student profiles or squad roles. You can keep it as a custom/inactive skill instead.`,
+      }
+    }
+
+    await prisma.skill.delete({ where: { id } })
+
+    revalidatePath('/admin/taxonomy')
+    revalidatePath('/profile')
+    revalidatePath('/teams/create')
+    revalidatePath('/discover')
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Error deleting admin skill:', err)
+    return { error: err.message || 'Failed to delete skill.' }
   }
 }

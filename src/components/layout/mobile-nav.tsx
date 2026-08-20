@@ -72,6 +72,7 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
     { label: "Overview", href: "/admin", icon: LayoutDashboard },
     { label: "Users", href: "/admin/users", icon: Users },
     { label: "Teams", href: "/admin/teams", icon: Layers },
+    { label: "Events & Hackathons", href: "/admin/events", icon: Calendar },
     { label: "Verification", href: "/admin/verify", icon: ShieldCheck },
     { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { label: "Skills & Roles", href: "/admin/taxonomy", icon: Sparkles },

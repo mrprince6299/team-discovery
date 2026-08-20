@@ -140,7 +140,7 @@ export default async function AdminOverviewPage() {
           </div>
           <div className="space-y-0.5">
             <div className="text-3xl font-extrabold text-foreground font-mono">
-              {metrics.verifiedUsers}
+              {metrics.verifiedStudents}
             </div>
             <p className="text-[11px] text-muted-foreground">
               Active verified candidate trust badges
@@ -160,10 +160,10 @@ export default async function AdminOverviewPage() {
           </div>
           <div className="space-y-0.5">
             <div className="text-3xl font-extrabold text-foreground font-mono">
-              {metrics.totalUsers}
+              {metrics.totalStudents}
             </div>
             <p className="text-[11px] text-muted-foreground">
-              Registered platform participants
+              Registered student participants
             </p>
           </div>
         </Card>

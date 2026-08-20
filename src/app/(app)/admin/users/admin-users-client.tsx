@@ -60,7 +60,7 @@ interface UserItem {
 interface AdminUsersClientProps {
   initialUsers: UserItem[]
   initialCounts: {
-    total: number
+    totalStudents: number
     verified: number
     pending: number
     admins: number
@@ -76,10 +76,15 @@ export function AdminUsersClient({ initialUsers, initialCounts }: AdminUsersClie
 
   const filteredUsers = useMemo(() => {
     return users.filter((u) => {
-      if (statusFilter === "VERIFIED" && u.verificationStatus !== "APPROVED") return false
-      if (statusFilter === "PENDING" && u.verificationStatus !== "PENDING") return false
-      if (statusFilter === "UNVERIFIED" && u.verificationStatus === "APPROVED") return false
-      if (statusFilter === "ADMIN" && !u.isAdmin) return false
+      if (statusFilter === "ALL") {
+        if (u.isAdmin) return false
+      } else if (statusFilter === "VERIFIED") {
+        if (u.isAdmin || u.verificationStatus !== "APPROVED") return false
+      } else if (statusFilter === "PENDING") {
+        if (u.isAdmin || u.verificationStatus !== "PENDING") return false
+      } else if (statusFilter === "ADMIN") {
+        if (!u.isAdmin) return false
+      }
 
       if (searchQuery.trim().length > 0) {
         const q = searchQuery.toLowerCase().trim()
@@ -136,7 +141,7 @@ export function AdminUsersClient({ initialUsers, initialCounts }: AdminUsersClie
           <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Total Students
           </span>
-          <div className="text-2xl font-extrabold text-foreground font-mono">{counts.total}</div>
+          <div className="text-2xl font-extrabold text-foreground font-mono">{counts.totalStudents}</div>
         </Card>
 
         <Card
@@ -190,7 +195,7 @@ export function AdminUsersClient({ initialUsers, initialCounts }: AdminUsersClie
         <Tabs value={statusFilter} onValueChange={setStatusFilter} className="w-full sm:w-auto">
           <TabsList className="grid grid-cols-4 bg-muted/60 p-1 rounded-xl">
             <TabsTrigger value="ALL" className="text-xs font-semibold rounded-lg">
-              All ({counts.total})
+              Students ({counts.totalStudents})
             </TabsTrigger>
             <TabsTrigger value="VERIFIED" className="text-xs font-semibold rounded-lg">
               Verified ({counts.verified})

@@ -1,6 +1,8 @@
 'use server'
 
 import { prisma } from '@/lib/prisma'
+import { isCurrentUserAdmin } from '@/app/actions/verification'
+import { revalidatePath } from 'next/cache'
 import { EventStatus, TeamStatus } from '@prisma/client'
 
 export interface EventCatalogItem {
@@ -251,5 +253,302 @@ export async function getEventShowcaseDetails(
   } catch (err: any) {
     console.error('Error fetching event showcase details:', err)
     return { error: err.message || 'Failed to load event details.' }
+  }
+}
+
+
+// ============================================================================
+// ADMIN EVENT & HACKATHON ACTIONS (ADMIN-ONLY)
+// ============================================================================
+
+export interface AdminEventItem {
+  id: string
+  name: string
+  description: string
+  startDate: Date
+  endDate: Date
+  registrationDeadline: Date
+  rules: string
+  bannerUrl: string | null
+  teamSizeInfo: string
+  status: EventStatus
+  teamCount: number
+  totalMembersCount: number
+  announcementCount: number
+}
+
+export interface AdminEventCounts {
+  total: number
+  draft: number
+  published: number
+  registrationOpen: number
+  registrationClosed: number
+  ongoing: number
+  completed: number
+  cancelled: number
+  totalTeams: number
+  totalParticipants: number
+}
+
+export interface AdminEventInput {
+  name: string
+  description: string
+  startDate: string | Date
+  endDate: string | Date
+  registrationDeadline: string | Date
+  rules: string
+  teamSizeInfo: string
+  bannerUrl?: string | null
+  status?: EventStatus
+}
+
+/**
+ * Fetches all events with administrative metrics (Admin Only)
+ */
+export async function getAdminEventsList(): Promise<{
+  error?: string
+  events?: AdminEventItem[]
+  counts?: AdminEventCounts
+}> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  try {
+    const rawEvents = await prisma.event.findMany({
+      orderBy: [{ startDate: 'desc' }],
+      include: {
+        _count: {
+          select: {
+            teams: true,
+            teamMembers: true,
+            announcements: true,
+          },
+        },
+      },
+    })
+
+    const events: AdminEventItem[] = rawEvents.map((e) => ({
+      id: e.id,
+      name: e.name,
+      description: e.description,
+      startDate: e.startDate,
+      endDate: e.endDate,
+      registrationDeadline: e.registrationDeadline,
+      rules: e.rules,
+      bannerUrl: e.bannerUrl,
+      teamSizeInfo: e.teamSizeInfo,
+      status: e.status,
+      teamCount: e._count.teams,
+      totalMembersCount: e._count.teamMembers,
+      announcementCount: e._count.announcements,
+    }))
+
+    const counts: AdminEventCounts = {
+      total: events.length,
+      draft: events.filter((e) => e.status === 'DRAFT').length,
+      published: events.filter((e) => e.status === 'PUBLISHED').length,
+      registrationOpen: events.filter((e) => e.status === 'REGISTRATION_OPEN').length,
+      registrationClosed: events.filter((e) => e.status === 'REGISTRATION_CLOSED').length,
+      ongoing: events.filter((e) => e.status === 'ONGOING').length,
+      completed: events.filter((e) => e.status === 'COMPLETED').length,
+      cancelled: events.filter((e) => e.status === 'CANCELLED').length,
+      totalTeams: events.reduce((acc, e) => acc + e.teamCount, 0),
+      totalParticipants: events.reduce((acc, e) => acc + e.totalMembersCount, 0),
+    }
+
+    return { events, counts }
+  } catch (err: any) {
+    console.error('Error fetching admin events list:', err)
+    return { error: err.message || 'Failed to fetch admin events list.' }
+  }
+}
+
+/**
+ * Creates a new event (Admin Only)
+ */
+export async function createAdminEvent(input: AdminEventInput): Promise<{
+  success?: boolean
+  error?: string
+  eventId?: string
+}> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  if (!input.name?.trim()) {
+    return { error: 'Event name is required.' }
+  }
+  if (!input.description?.trim()) {
+    return { error: 'Event description is required.' }
+  }
+  if (!input.rules?.trim()) {
+    return { error: 'Event rules & guidelines are required.' }
+  }
+  if (!input.teamSizeInfo?.trim()) {
+    return { error: 'Team size rules are required (e.g., "2-4 Members").' }
+  }
+
+  try {
+    const startDate = new Date(input.startDate)
+    const endDate = new Date(input.endDate)
+    const registrationDeadline = new Date(input.registrationDeadline)
+
+    if (isNaN(startDate.getTime()) || isNaN(endDate.getTime()) || isNaN(registrationDeadline.getTime())) {
+      return { error: 'Please provide valid dates for all schedule fields.' }
+    }
+
+    const newEvent = await prisma.event.create({
+      data: {
+        name: input.name.trim(),
+        description: input.description.trim(),
+        rules: input.rules.trim(),
+        teamSizeInfo: input.teamSizeInfo.trim(),
+        startDate,
+        endDate,
+        registrationDeadline,
+        bannerUrl: input.bannerUrl?.trim() || null,
+        status: input.status || 'DRAFT',
+      },
+    })
+
+    revalidatePath('/admin/events')
+    revalidatePath('/events')
+    revalidatePath('/dashboard')
+
+    return { success: true, eventId: newEvent.id }
+  } catch (err: any) {
+    console.error('Error creating admin event:', err)
+    return { error: err.message || 'Failed to create event.' }
+  }
+}
+
+/**
+ * Updates an existing event (Admin Only)
+ */
+export async function updateAdminEvent(
+  id: string,
+  input: Partial<AdminEventInput>
+): Promise<{ success?: boolean; error?: string }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  try {
+    const existing = await prisma.event.findUnique({ where: { id } })
+    if (!existing) {
+      return { error: 'Event not found.' }
+    }
+
+    const dataToUpdate: any = {}
+    if (input.name !== undefined) dataToUpdate.name = input.name.trim()
+    if (input.description !== undefined) dataToUpdate.description = input.description.trim()
+    if (input.rules !== undefined) dataToUpdate.rules = input.rules.trim()
+    if (input.teamSizeInfo !== undefined) dataToUpdate.teamSizeInfo = input.teamSizeInfo.trim()
+    if (input.bannerUrl !== undefined) dataToUpdate.bannerUrl = input.bannerUrl?.trim() || null
+    if (input.status !== undefined) dataToUpdate.status = input.status
+
+    if (input.startDate !== undefined) {
+      const d = new Date(input.startDate)
+      if (!isNaN(d.getTime())) dataToUpdate.startDate = d
+    }
+    if (input.endDate !== undefined) {
+      const d = new Date(input.endDate)
+      if (!isNaN(d.getTime())) dataToUpdate.endDate = d
+    }
+    if (input.registrationDeadline !== undefined) {
+      const d = new Date(input.registrationDeadline)
+      if (!isNaN(d.getTime())) dataToUpdate.registrationDeadline = d
+    }
+
+    await prisma.event.update({
+      where: { id },
+      data: dataToUpdate,
+    })
+
+    revalidatePath('/admin/events')
+    revalidatePath('/events')
+    revalidatePath(`/events/${id}`)
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Error updating admin event:', err)
+    return { error: err.message || 'Failed to update event.' }
+  }
+}
+
+/**
+ * Updates the status of an event (Admin Only)
+ */
+export async function setAdminEventStatus(
+  id: string,
+  status: EventStatus
+): Promise<{ success?: boolean; error?: string; status?: EventStatus }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  try {
+    const existing = await prisma.event.findUnique({ where: { id } })
+    if (!existing) {
+      return { error: 'Event not found.' }
+    }
+
+    await prisma.event.update({
+      where: { id },
+      data: { status },
+    })
+
+    revalidatePath('/admin/events')
+    revalidatePath('/events')
+    revalidatePath(`/events/${id}`)
+
+    return { success: true, status }
+  } catch (err: any) {
+    console.error('Error changing event status:', err)
+    return { error: err.message || 'Failed to change event status.' }
+  }
+}
+
+/**
+ * Deletes an event (Admin Only)
+ */
+export async function deleteAdminEvent(id: string): Promise<{ success?: boolean; error?: string }> {
+  const isAdmin = await isCurrentUserAdmin()
+  if (!isAdmin) {
+    return { error: 'Unauthorized: Admin access required.' }
+  }
+
+  try {
+    const existing = await prisma.event.findUnique({
+      where: { id },
+      include: {
+        _count: { select: { teams: true } },
+      },
+    })
+
+    if (!existing) {
+      return { error: 'Event not found.' }
+    }
+
+    if (existing._count.teams > 0 && existing.status !== 'DRAFT') {
+      return {
+        error: `Cannot delete event with ${existing._count.teams} active squads. You can archive or cancel it instead.`,
+      }
+    }
+
+    await prisma.event.delete({ where: { id } })
+
+    revalidatePath('/admin/events')
+    revalidatePath('/events')
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('Error deleting admin event:', err)
+    return { error: err.message || 'Failed to delete event.' }
   }
 }

@@ -49,6 +49,7 @@ interface StudentVerifyClientProps {
     availability: string
     primaryRole: string | null
     bio: string | null
+    isAdmin?: boolean
     skills: Array<{ id: string; name: string; level: string }>
     interests: Array<{ id: string; name: string }>
     completeness: {
@@ -93,6 +94,53 @@ export function StudentVerifyClient({
     percentage: 0,
     missingFields: [],
     checks: [],
+  }
+
+  if (user.isAdmin) {
+    return (
+      <div className="max-w-3xl mx-auto space-y-8 pb-16 pt-6">
+        <div className="flex items-center justify-between">
+          <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+            <Link href="/dashboard">
+              <ArrowLeft className="size-3.5" />
+              <span>Return to Dashboard</span>
+            </Link>
+          </Button>
+        </div>
+
+        <Card className="border-primary/30 bg-gradient-to-b from-primary/5 to-card rounded-2xl shadow-sm text-center p-8 sm:p-12 space-y-6">
+          <div className="size-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto text-primary">
+            <ShieldCheck className="size-8" />
+          </div>
+
+          <div className="max-w-md mx-auto space-y-2">
+            <Badge variant="outline" className="text-xs uppercase font-bold text-primary border-primary/40 bg-primary/10 px-2.5 py-0.5">
+              Admin Account
+            </Badge>
+            <h1 className="text-2xl font-extrabold text-foreground tracking-tight">
+              Administrator Account
+            </h1>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Student verification is not required for administrator accounts. You manage student verifications, reviews, and platform operations directly from the Admin Console.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+            <Button asChild size="default" className="font-semibold shadow-xs gap-2">
+              <Link href="/admin">
+                <ShieldCheck className="size-4" />
+                <span>Open Admin Console</span>
+              </Link>
+            </Button>
+            <Button asChild variant="outline" size="default">
+              <Link href="/dashboard">
+                <span>Return to Dashboard</span>
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )
   }
 
   const handleSubmit = () => {
