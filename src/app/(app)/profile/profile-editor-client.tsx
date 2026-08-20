@@ -88,6 +88,10 @@ interface ProfileEditorClientProps {
     verificationStatus: string
     collegeId: string | null
     departmentId: string | null
+    privateData?: {
+      collegeEmail?: string | null
+      erp?: string | null
+    } | null
     college?: { id: string; name: string } | null
     department?: { id: string; name: string } | null
     skills: Array<{
@@ -176,6 +180,11 @@ export function ProfileEditorClient({
 
   const [program, setProgram] = useState<string>(initialProg)
   const [branch, setBranch] = useState<string>(initialBranch)
+
+  const initialErp = profile.privateData?.erp || ""
+  const isAutoErp = initialErp ? /^erp_[0-9a-f]{8}$/i.test(initialErp) : false
+  const [erp, setErp] = useState<string>(isAutoErp ? "" : initialErp)
+  const [collegeEmail, setCollegeEmail] = useState<string>(profile.privateData?.collegeEmail || "")
 
   // When Program changes, update available branch list
   const availableBranches = getBranchesForProgram(program)
@@ -807,6 +816,44 @@ export function ProfileEditorClient({
                         ))}
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Field C: College Email */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="collegeEmail" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      College Email Address
+                    </label>
+                    <Input
+                      id="collegeEmail"
+                      value={collegeEmail}
+                      onChange={(e) => setCollegeEmail(e.target.value)}
+                      placeholder="e.g. student@college.edu"
+                      disabled={isPending}
+                      className="h-10 rounded-xl"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Your institutional email for verification trust checks.
+                    </p>
+                  </div>
+
+                  {/* Field D: ERP / Student ID */}
+                  <div className="space-y-1.5">
+                    <label htmlFor="erp" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      ERP / Student ID Number
+                    </label>
+                    <Input
+                      id="erp"
+                      value={erp}
+                      onChange={(e) => setErp(e.target.value)}
+                      placeholder="e.g. 2024BCSE101, 1029384"
+                      disabled={isPending}
+                      className="h-10 rounded-xl"
+                    />
+                    <p className="text-[11px] text-muted-foreground">
+                      Your unique institutional student registration identifier.
+                    </p>
                   </div>
                 </div>
               </div>

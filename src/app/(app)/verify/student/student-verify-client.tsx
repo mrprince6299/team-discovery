@@ -8,18 +8,16 @@ import {
   ShieldAlert,
   Clock,
   CheckCircle2,
+  XCircle,
   AlertCircle,
   Sparkles,
   ArrowLeft,
   Loader2,
   ExternalLink,
   Edit3,
-  Building,
-  GraduationCap,
-  Briefcase,
   Layers,
-  User,
   Info,
+  ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +25,13 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { submitStudentVerificationRequest } from "@/app/actions/verification"
 import { TechIcon } from "@/components/common/tech-icon"
+
+interface VerificationCheck {
+  id: string
+  label: string
+  completed: boolean
+  value: string | null
+}
 
 interface StudentVerifyClientProps {
   user: {
@@ -38,13 +43,25 @@ interface StudentVerifyClientProps {
     verificationStatus: string
     college: string | null
     department: string | null
+    program: string | null
+    branch: string | null
     year: number | null
+    availability: string
     primaryRole: string | null
     bio: string | null
     skills: Array<{ id: string; name: string; level: string }>
+    interests: Array<{ id: string; name: string }>
     completeness: {
       percentage: number
       breakdown: Array<{ label: string; completed: boolean; weight: number }>
+    }
+    readiness: {
+      isReady: boolean
+      completedCount: number
+      totalCount: number
+      percentage: number
+      missingFields: string[]
+      checks: VerificationCheck[]
     }
   }
   verificationRequest: {
@@ -69,7 +86,23 @@ export function StudentVerifyClient({
   const isPendingReview = request?.status === "PENDING"
   const isRejected = request?.status === "REJECTED"
 
+  const readiness = user.readiness || {
+    isReady: false,
+    completedCount: 0,
+    totalCount: 11,
+    percentage: 0,
+    missingFields: [],
+    checks: [],
+  }
+
   const handleSubmit = () => {
+    if (!readiness.isReady) {
+      toast.error(
+        `Please complete your profile before requesting verification. Missing: ${readiness.missingFields.join(", ")}`
+      )
+      return
+    }
+
     startTransition(async () => {
       const res = await submitStudentVerificationRequest()
       if (res.error) {
@@ -108,18 +141,20 @@ export function StudentVerifyClient({
         </Button>
       </div>
 
-      {/* Header Title */}
-      <div className="space-y-1">
+      {/* Header Title & Description */}
+      <div className="space-y-2">
         <div className="flex items-center gap-2.5">
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Student Trust Verification
+            {readiness.isReady
+              ? "Student Trust Verification"
+              : "Complete your profile to request verification"}
           </h1>
           <Badge variant="outline" className="text-xs uppercase font-semibold border-primary/30 text-primary bg-primary/10">
             Trust Signal
           </Badge>
         </div>
-        <p className="text-xs sm:text-sm text-muted-foreground">
-          Verify your student identity to receive a Verified Student badge and priority trust visibility in teammate discovery.
+        <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+          To verify your student profile, please complete the required information below. You can still use the full platform while your profile is incomplete.
         </p>
       </div>
 
@@ -129,12 +164,12 @@ export function StudentVerifyClient({
         <div className="space-y-1">
           <p className="font-bold text-foreground">Verification is optional for platform access</p>
           <p className="text-muted-foreground leading-relaxed">
-            You already have full access to create teams, discover candidates, send invitations, and join hackathon squads. Verification exists purely to establish peer trust and boost your visibility. No documents or ID card uploads required.
+            You already have full access to create teams, discover candidates, send invitations, and join hackathon squads. Verification exists purely to establish peer trust and boost your ranking in teammate discovery. No document or ID card uploads required.
           </p>
         </div>
       </div>
 
-      {/* Current Status Card */}
+      {/* Current Status Banner (Approved / Pending / Rejected) */}
       {isApproved ? (
         <Card className="border-emerald-500/40 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-card rounded-2xl shadow-sm overflow-hidden">
           <CardContent className="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -207,7 +242,7 @@ export function StudentVerifyClient({
               </div>
             </div>
 
-            <div className="flex items-center gap-3 pt-2 border-t border-border/60">
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-border/60">
               <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs">
                 <Link href="/profile">
                   <Edit3 className="size-3.5" />
@@ -217,7 +252,7 @@ export function StudentVerifyClient({
               <Button
                 size="sm"
                 onClick={handleSubmit}
-                disabled={isPending}
+                disabled={isPending || !readiness.isReady}
                 className="gap-1.5 text-xs font-semibold shadow-xs"
               >
                 {isPending ? (
@@ -237,108 +272,119 @@ export function StudentVerifyClient({
         </Card>
       ) : null}
 
-      {/* Profile Snapshot Card */}
-      <Card className="border-border/80 bg-card shadow-sm rounded-2xl">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <User className="size-4 text-primary" />
-              <span>Institutional &amp; Profile Summary</span>
-            </CardTitle>
-            <Button asChild variant="ghost" size="sm" className="h-8 gap-1.5 text-xs text-primary">
+      {/* Verification Readiness Checklist Card */}
+      <Card className="border-border/80 bg-card shadow-sm rounded-2xl overflow-hidden">
+        <CardHeader className="pb-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Sparkles className="size-4 text-primary" />
+                <span>Verification Readiness Checklist</span>
+              </CardTitle>
+              <CardDescription className="text-xs mt-0.5">
+                All 11 institutional and candidate fields must be completed to request trust verification.
+              </CardDescription>
+            </div>
+
+            <Button asChild variant="outline" size="sm" className="gap-1.5 text-xs font-semibold shrink-0">
               <Link href="/profile">
                 <Edit3 className="size-3.5" />
-                <span>Edit Profile</span>
+                <span>Complete Profile</span>
               </Link>
             </Button>
           </div>
-          <CardDescription className="text-xs">
-            Review the details that administrators evaluate when validating student trust status.
-          </CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {/* Profile Completeness Meter */}
+          {/* Progress Bar & Counter */}
           <div className="space-y-2 p-4 rounded-xl bg-muted/30 border border-border/60">
             <div className="flex justify-between items-center text-xs">
               <span className="font-semibold text-foreground flex items-center gap-1.5">
-                <Sparkles className="size-3.5 text-primary" />
-                <span>Profile Completeness</span>
+                <span>Readiness Progress</span>
+                <Badge
+                  variant={readiness.isReady ? "success" : "outline"}
+                  className="text-[10px] uppercase font-semibold"
+                >
+                  {readiness.isReady ? "Ready for Verification" : `${readiness.completedCount} of ${readiness.totalCount} Complete`}
+                </Badge>
               </span>
               <span className="font-mono font-bold text-primary">
-                {user.completeness.percentage}%
+                {readiness.percentage}%
               </span>
             </div>
-            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+            <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
               <div
-                className="h-full bg-primary transition-all duration-500 rounded-full"
-                style={{ width: `${user.completeness.percentage}%` }}
+                className={`h-full transition-all duration-500 rounded-full ${
+                  readiness.isReady ? "bg-emerald-500" : "bg-primary"
+                }`}
+                style={{ width: `${readiness.percentage}%` }}
               />
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-[11px] text-muted-foreground">
-              {user.completeness.breakdown.map((item) => (
-                <span key={item.label} className="inline-flex items-center gap-1">
-                  {item.completed ? (
-                    <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                  ) : (
-                    <AlertCircle className="size-3 text-muted-foreground shrink-0" />
-                  )}
-                  <span className={item.completed ? "text-foreground font-medium" : ""}>
-                    {item.label}
-                  </span>
-                </span>
-              ))}
             </div>
           </div>
 
-          {/* Details Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-            <div className="p-3.5 rounded-xl border border-border/70 bg-card space-y-1">
-              <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider block">
-                Full Name
-              </span>
-              <span className="font-bold text-foreground text-sm">{user.name}</span>
-              <span className="text-muted-foreground block text-[11px]">@{user.username}</span>
-            </div>
-
-            <div className="p-3.5 rounded-xl border border-border/70 bg-card space-y-1">
-              <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider block">
-                College / Institution
-              </span>
-              <div className="flex items-center gap-1.5">
-                <Building className="size-3.5 text-primary shrink-0" />
-                <span className="font-semibold text-foreground">
-                  {user.college || "Not specified in profile"}
-                </span>
+          {/* Missing Fields Alert Banner (if incomplete) */}
+          {!readiness.isReady && readiness.missingFields.length > 0 && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 space-y-2 text-xs">
+              <div className="flex items-center gap-2 font-bold text-destructive">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>Required fields missing ({readiness.missingFields.length}):</span>
               </div>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {readiness.missingFields.map((field) => (
+                  <Badge
+                    key={field}
+                    variant="outline"
+                    className="border-destructive/40 text-destructive bg-destructive/10 text-xs font-semibold py-1 px-2.5"
+                  >
+                    ✗ {field}
+                  </Badge>
+                ))}
+              </div>
+              <p className="text-muted-foreground text-[11px] pt-1">
+                Click <Link href="/profile" className="text-primary underline font-medium">Complete Profile</Link> to fill in these missing details.
+              </p>
             </div>
+          )}
 
-            <div className="p-3.5 rounded-xl border border-border/70 bg-card space-y-1">
-              <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider block">
-                Degree &amp; Specialization
-              </span>
-              <div className="flex items-center gap-1.5">
-                <GraduationCap className="size-3.5 text-primary shrink-0" />
-                <span className="font-semibold text-foreground">
-                  {user.department || "Not specified"}
-                </span>
-                {user.year && (
-                  <span className="text-muted-foreground">· Year {user.year}</span>
+          {/* 11 Required Fields Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            {readiness.checks.map((check) => (
+              <div
+                key={check.id}
+                className={`p-3.5 rounded-xl border transition-colors flex items-start justify-between gap-2 ${
+                  check.completed
+                    ? "border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-500/10"
+                    : "border-border/70 bg-muted/10"
+                }`}
+              >
+                <div className="space-y-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    {check.completed ? (
+                      <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    ) : (
+                      <XCircle className="size-4 text-destructive shrink-0" />
+                    )}
+                    <span className="font-bold text-foreground truncate">{check.label}</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground truncate pl-5.5">
+                    {check.completed ? (
+                      <span className="text-foreground/90 font-medium">{check.value || "Configured"}</span>
+                    ) : (
+                      <span className="text-destructive/80 font-medium italic">Missing in profile</span>
+                    )}
+                  </p>
+                </div>
+
+                {!check.completed && (
+                  <Button asChild variant="ghost" size="sm" className="h-7 px-2 text-[11px] text-primary shrink-0">
+                    <Link href="/profile">
+                      <span>Add</span>
+                      <ArrowRight className="size-3 ml-1" />
+                    </Link>
+                  </Button>
                 )}
               </div>
-            </div>
-
-            <div className="p-3.5 rounded-xl border border-border/70 bg-card space-y-1">
-              <span className="text-muted-foreground text-[11px] font-semibold uppercase tracking-wider block">
-                Primary Role
-              </span>
-              <div className="flex items-center gap-1.5">
-                <Briefcase className="size-3.5 text-primary shrink-0" />
-                <span className="font-semibold text-foreground">
-                  {user.primaryRole || "Not specified"}
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
 
           {/* Technical Skills Listed */}
@@ -349,12 +395,15 @@ export function StudentVerifyClient({
                 <span>Declared Skills ({user.skills.length})</span>
               </span>
               <Link href="/profile" className="text-primary text-[11px] hover:underline">
-                Add skills in profile
+                Manage skills in profile
               </Link>
             </div>
 
             {user.skills.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No technical skills added yet.</p>
+              <p className="text-xs text-destructive italic flex items-center gap-1.5">
+                <AlertCircle className="size-3.5" />
+                <span>No technical skills added yet (at least 1 required).</span>
+              </p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {user.skills.map((s) => (
@@ -374,28 +423,50 @@ export function StudentVerifyClient({
           </div>
         </CardContent>
 
+        {/* Verification Request Action Footer */}
         {!isApproved && !isPendingReview && (
-          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-3 p-6 border-t border-border/60 bg-muted/10 rounded-b-2xl">
-            <p className="text-xs text-muted-foreground">
-              By submitting, your profile details will be queued for administrator trust verification.
-            </p>
-            <Button
-              onClick={handleSubmit}
-              disabled={isPending}
-              className="w-full sm:w-auto gap-2 font-semibold shadow-xs"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>Submitting Request...</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="size-4" />
-                  <span>Request Student Verification</span>
-                </>
-              )}
-            </Button>
+          <CardFooter className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 border-t border-border/60 bg-muted/10 rounded-b-2xl">
+            <div className="space-y-0.5 text-left w-full sm:w-auto">
+              <p className="text-xs font-medium text-foreground">
+                {readiness.isReady
+                  ? "All required fields complete. Ready for administrator review."
+                  : `${readiness.missingFields.length} required field${readiness.missingFields.length === 1 ? "" : "s"} remaining before submission.`}
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                Verification requests are queued for administrator review and do not block normal platform access.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 w-full sm:w-auto shrink-0">
+              {!readiness.isReady ? (
+                <Button asChild variant="outline" className="w-full sm:w-auto gap-2 font-semibold shadow-xs">
+                  <Link href="/profile">
+                    <Edit3 className="size-4" />
+                    <span>Complete Profile First</span>
+                  </Link>
+                </Button>
+              ) : null}
+
+              <Button
+                onClick={handleSubmit}
+                disabled={isPending || !readiness.isReady}
+                className={`w-full sm:w-auto gap-2 font-semibold shadow-xs ${
+                  readiness.isReady ? "bg-primary text-primary-foreground" : "opacity-60 cursor-not-allowed"
+                }`}
+              >
+                {isPending ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" />
+                    <span>Submitting Request...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="size-4" />
+                    <span>Request Student Verification</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </CardFooter>
         )}
       </Card>

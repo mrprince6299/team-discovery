@@ -12,6 +12,10 @@ import {
   Mail,
   PlusCircle,
   ShieldCheck,
+  ArrowLeft,
+  Layers,
+  BarChart3,
+  Sparkles,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -24,6 +28,86 @@ interface SidebarProps {
 
 export function Sidebar({ isVerified = false, className }: SidebarProps) {
   const pathname = usePathname()
+  const isAdminConsole = pathname.startsWith("/admin")
+
+  if (isAdminConsole) {
+    const adminLinks = [
+      { label: "Overview", href: "/admin", icon: LayoutDashboard },
+      { label: "Users", href: "/admin/users", icon: Users },
+      { label: "Teams", href: "/admin/teams", icon: Layers },
+      { label: "Student Verification", href: "/admin/verify", icon: ShieldCheck },
+      { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+      { label: "Skills & Roles", href: "/admin/taxonomy", icon: Sparkles },
+    ]
+
+    return (
+      <aside
+        className={cn(
+          "hidden lg:flex w-64 flex-col justify-between border-r border-border/80 bg-background/50 p-4 shrink-0",
+          className
+        )}
+        aria-label="Admin Navigation"
+      >
+        <div className="space-y-6">
+          {/* Admin Console Header */}
+          <div className="px-3.5 py-3 rounded-xl bg-primary/10 border border-primary/20 space-y-1">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-primary shrink-0" />
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Admin Console
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Management &amp; Trust Oversight
+            </p>
+          </div>
+
+          {/* Admin Navigation */}
+          <div>
+            <div className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Management
+            </div>
+            <nav className="space-y-1">
+              {adminLinks.map((item) => {
+                const Icon = item.icon
+                const isActive =
+                  item.href === "/admin"
+                    ? pathname === "/admin"
+                    : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-secondary text-foreground font-semibold"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    )}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <Icon className="size-4" />
+                      <span>{item.label}</span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
+        </div>
+
+        {/* Switch Back to Student Platform */}
+        <div className="border-t border-border/60 pt-4 space-y-2">
+          <Button asChild variant="outline" size="sm" className="w-full justify-start gap-2 text-xs">
+            <Link href="/dashboard">
+              <ArrowLeft className="size-3.5" />
+              <span>Student Platform</span>
+            </Link>
+          </Button>
+        </div>
+      </aside>
+    )
+  }
 
   const mainLinks = [
     { label: "Find Teammates", href: "/discover", icon: Compass, badge: "Role Match" },
@@ -125,18 +209,18 @@ export function Sidebar({ isVerified = false, className }: SidebarProps) {
         </div>
       </div>
 
-      {/* Verification Notice if Unverified */}
+      {/* Verification Notice */}
       {!isVerified && (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-700 dark:text-amber-300">
-          <div className="flex items-center gap-1.5 font-semibold">
+        <div className="rounded-xl border border-primary/30 bg-primary/5 p-3 text-xs text-foreground">
+          <div className="flex items-center gap-1.5 font-semibold text-primary">
             <ShieldCheck className="size-4" />
-            <span>Verification Required</span>
+            <span>Student Verification</span>
           </div>
-          <p className="mt-1 text-[11px] text-amber-600/90 dark:text-amber-400/90">
-            Submit your student details to unlock team recruitment.
+          <p className="mt-1 text-[11px] text-muted-foreground leading-relaxed">
+            Verify your student identity to receive a verified badge and priority ranking.
           </p>
-          <Button asChild size="xs" variant="outline" className="mt-2.5 w-full bg-background">
-            <Link href="/verify">Verify Now</Link>
+          <Button asChild size="xs" variant="outline" className="mt-2.5 w-full">
+            <Link href="/verify/student">Verify Profile</Link>
           </Button>
         </div>
       )}

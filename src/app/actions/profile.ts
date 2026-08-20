@@ -184,6 +184,12 @@ export async function getPublicProfile(userId: string) {
         },
         orderBy: { createdAt: 'desc' },
       },
+      privateData: {
+        select: {
+          collegeEmail: true,
+          erp: true,
+        },
+      },
     },
   })
 
@@ -294,6 +300,8 @@ export async function updateBasicProfile(data: {
   branchName?: string | null
   role?: string | null
   profilePhoto?: string | null
+  erp?: string | null
+  collegeEmail?: string | null
 }) {
   const authUser = await getAuthenticatedUser()
 
@@ -330,8 +338,30 @@ export async function updateBasicProfile(data: {
       },
     })
 
+    if (data.erp !== undefined || data.collegeEmail !== undefined) {
+      const erpVal = data.erp?.trim()
+      const emailVal = data.collegeEmail?.trim()
+      try {
+        await prisma.userPrivate.upsert({
+          where: { userId: authUser.id },
+          update: {
+            ...(erpVal ? { erp: erpVal } : {}),
+            ...(emailVal ? { collegeEmail: emailVal } : {}),
+          },
+          create: {
+            userId: authUser.id,
+            erp: erpVal || ('ERP_' + authUser.id.slice(0, 8).toUpperCase()),
+            collegeEmail: emailVal || authUser.email || ('student_' + authUser.id.slice(0, 8) + '@college.edu'),
+          },
+        })
+      } catch (privErr) {
+        console.error('Error updating private data:', privErr)
+      }
+    }
+
     revalidatePath('/profile')
     revalidatePath(`/users/${authUser.id}`)
+    revalidatePath('/verify/student')
     return { success: true, user: updated }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to update profile' }

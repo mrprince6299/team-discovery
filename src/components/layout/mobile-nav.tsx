@@ -17,6 +17,10 @@ import {
   Menu,
   Bell,
   Search,
+  ArrowLeft,
+  Layers,
+  BarChart3,
+  Sparkles,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +42,7 @@ interface MobileNavProps {
     verificationStatus?: string | null
     avatarUrl?: string | null
     unreadNotificationsCount?: number
+    isAdmin?: boolean
   } | null
   onLogout?: () => void
 }
@@ -46,8 +51,9 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
   const [open, setOpen] = React.useState(false)
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const pathname = usePathname()
+  const isAdminConsole = pathname.startsWith("/admin")
 
-  const navItems = [
+  const studentNavItems = [
     { label: "Find Teammates", href: "/discover", icon: Compass, badge: "Match" },
     { label: "Browse Teams", href: "/teams", icon: Users },
     { label: "Events & Hackathons", href: "/events", icon: Calendar },
@@ -60,6 +66,15 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
       icon: Bell,
       badge: (user?.unreadNotificationsCount ?? 0) > 0 ? `${user?.unreadNotificationsCount}` : undefined,
     },
+  ]
+
+  const adminNavItems = [
+    { label: "Overview", href: "/admin", icon: LayoutDashboard },
+    { label: "Users", href: "/admin/users", icon: Users },
+    { label: "Teams", href: "/admin/teams", icon: Layers },
+    { label: "Verification", href: "/admin/verify", icon: ShieldCheck },
+    { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
+    { label: "Skills & Roles", href: "/admin/taxonomy", icon: Sparkles },
   ]
 
   const isVerified = isUserEligibleForCoreFeatures(user?.verificationStatus)
@@ -84,7 +99,9 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
                 <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-sm">
                   TD
                 </span>
-                <span className="font-bold text-lg tracking-tight">Team Discovery</span>
+                <span className="font-bold text-lg tracking-tight">
+                  {isAdminConsole ? "Admin Console" : "Team Discovery"}
+                </span>
               </SheetTitle>
               {user && (
                 <div className="mt-2 flex items-center justify-between">
@@ -92,116 +109,186 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
                     {user.email}
                   </span>
                   <Badge
-                    variant={isVerified ? "success" : "outline"}
+                    variant={user.isAdmin ? "outline" : isVerified ? "success" : "outline"}
                     className="text-[10px] uppercase tracking-wider"
                   >
-                    {isVerified ? "Verified" : "Pending"}
+                    {user.isAdmin ? "Admin" : isVerified ? "Verified" : "Pending"}
                   </Badge>
                 </div>
               )}
             </SheetHeader>
 
-            <div className="p-4 pb-0">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setOpen(false)
-                  setIsSearchOpen(true)
-                }}
-                className="w-full justify-start gap-2 h-9 text-xs text-muted-foreground"
-              >
-                <Search className="size-4" />
-                <span>Search platform...</span>
-              </Button>
-            </div>
+            {isAdminConsole ? (
+              /* Admin Specific Navigation */
+              <div className="p-4 space-y-4">
+                <div className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Administration
+                </div>
+                <nav className="space-y-1">
+                  {adminNavItems.map((item) => {
+                    const Icon = item.icon
+                    const isActive =
+                      item.href === "/admin"
+                        ? pathname === "/admin"
+                        : pathname === item.href || pathname.startsWith(`${item.href}/`)
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setOpen(false)}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-secondary text-foreground font-semibold"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        <span>{item.label}</span>
+                      </Link>
+                    )
+                  })}
+                </nav>
 
-            <nav className="p-4 space-y-1" aria-label="Mobile Navigation">
-            {navItems.map((item) => {
-              const Icon = item.icon
-              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className={cn(
-                    "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  <div className="flex items-center gap-3">
-                    <Icon className="size-4" />
-                    <span>{item.label}</span>
-                  </div>
-                  {item.badge && (
-                    <Badge
-                      variant={isActive ? "secondary" : "exact"}
-                      className="text-[10px] px-1.5 py-0"
-                    >
-                      {item.badge}
-                    </Badge>
-                  )}
-                </Link>
-              )
-            })}
-
-            {isVerified && (
-              <div className="pt-2">
+                <div className="pt-4 border-t border-border/60">
+                  <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-start gap-2 text-xs"
+                    onClick={() => setOpen(false)}
+                  >
+                    <Link href="/dashboard">
+                      <ArrowLeft className="size-3.5" />
+                      <span>Switch to Student Platform</span>
+                    </Link>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* Student Navigation */
+              <div className="p-4 space-y-4">
+                {/* Search Bar Trigger on Mobile */}
                 <Button
-                  asChild
-                  className="w-full justify-start gap-2 h-9"
-                  onClick={() => setOpen(false)}
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setOpen(false)
+                    setIsSearchOpen(true)
+                  }}
+                  className="w-full justify-start gap-2 text-xs font-normal text-muted-foreground border-border/80"
                 >
-                  <Link href="/teams/create">
-                    <PlusCircle className="size-4" />
-                    <span>Create Team</span>
+                  <Search className="size-3.5" />
+                  <span>Search skills, users, teams...</span>
+                </Button>
+
+                {isVerified && (
+                  <Button asChild className="w-full justify-start gap-2 shadow-xs" size="sm">
+                    <Link href="/teams/create" onClick={() => setOpen(false)}>
+                      <PlusCircle className="size-4" />
+                      <span>Create Team</span>
+                    </Link>
+                  </Button>
+                )}
+
+                <div className="space-y-1">
+                  <div className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Menu
+                  </div>
+                  <nav className="space-y-1">
+                    {studentNavItems.map((item) => {
+                      const Icon = item.icon
+                      const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setOpen(false)}
+                          className={cn(
+                            "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                            isActive
+                              ? "bg-secondary text-foreground font-semibold"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          )}
+                        >
+                          <div className="flex items-center gap-3">
+                            <Icon className="size-4" />
+                            <span>{item.label}</span>
+                          </div>
+                          {item.badge && (
+                            <Badge
+                              variant={isActive ? "secondary" : "exact"}
+                              className="text-[10px] px-1.5 py-0"
+                            >
+                              {item.badge}
+                            </Badge>
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </nav>
+                </div>
+
+                {user?.isAdmin && (
+                  <div className="pt-2 border-t border-border/60">
+                    <Button
+                      asChild
+                      variant="outline"
+                      size="sm"
+                      className="w-full justify-start gap-2 text-xs text-primary font-semibold"
+                      onClick={() => setOpen(false)}
+                    >
+                      <Link href="/admin">
+                        <ShieldCheck className="size-4" />
+                        <span>Admin Console</span>
+                      </Link>
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Bottom Actions */}
+          <div className="p-4 border-t border-border/60 space-y-2">
+            {user ? (
+              <>
+                <Button asChild variant="outline" size="sm" className="w-full justify-start gap-2">
+                  <Link href="/profile" onClick={() => setOpen(false)}>
+                    <User className="size-4" />
+                    <span>My Profile</span>
                   </Link>
+                </Button>
+                {onLogout && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start gap-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      setOpen(false)
+                      onLogout()
+                    }}
+                  >
+                    <LogOut className="size-4" />
+                    <span>Sign Out</span>
+                  </Button>
+                )}
+              </>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/login" onClick={() => setOpen(false)}>Sign In</Link>
+                </Button>
+                <Button asChild size="sm">
+                  <Link href="/signup" onClick={() => setOpen(false)}>Sign Up</Link>
                 </Button>
               </div>
             )}
-          </nav>
-        </div>
+          </div>
+        </SheetContent>
+      </Sheet>
 
-        <div className="p-4 border-t border-border/60 space-y-1 bg-muted/30">
-          <Link
-            href="/profile"
-            onClick={() => setOpen(false)}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          >
-            <User className="size-4" />
-            <span>Profile & Skills</span>
-          </Link>
-          {!isVerified && (
-            <Link
-              href="/verify"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-amber-600 hover:bg-amber-500/10 transition-colors"
-            >
-              <ShieldCheck className="size-4" />
-              <span>Verify Account</span>
-            </Link>
-          )}
-          {onLogout && (
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false)
-                onLogout()
-              }}
-              className="w-full flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-destructive hover:bg-destructive/10 transition-colors text-left"
-            >
-              <LogOut className="size-4" />
-              <span>Sign Out</span>
-            </button>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
-
-    <GlobalSearchDialog isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} />
-  </>
+      <GlobalSearchDialog isOpen={isSearchOpen} onOpenChange={setIsSearchOpen} />
+    </>
   )
 }
