@@ -116,11 +116,12 @@ export async function submitStudentVerificationRequest() {
     return { error: 'You already have an active verification request under review.' }
   }
 
-  const erpIdentifier = user.privateData?.erp || user.username || 'STUDENT'
+  const erpIdentifier =
+    user.privateData?.erp || user.username || `ERP_${user.id.slice(0, 8).toUpperCase()}`
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.verificationRequest.upsert({
+    const result = await prisma.$transaction(async (tx) => {
+      const vReq = await tx.verificationRequest.upsert({
         where: { userId: user.id },
         update: {
           status: 'PENDING',
@@ -141,6 +142,8 @@ export async function submitStudentVerificationRequest() {
           verificationStatus: 'PENDING',
         },
       })
+
+      return vReq
     })
 
     revalidatePath('/verify/student')
@@ -148,8 +151,13 @@ export async function submitStudentVerificationRequest() {
     revalidatePath(`/users/${user.id}`)
     revalidatePath('/admin/verify')
 
-    return { success: true, message: 'Verification request submitted for admin review.' }
+    return {
+      success: true,
+      message: 'Verification request submitted for admin review.',
+      requestId: result.id,
+    }
   } catch (err) {
+    console.error('Error submitting verification request:', err)
     return { error: err instanceof Error ? err.message : 'Failed to submit verification request' }
   }
 }

@@ -65,9 +65,9 @@ export function StudentVerifyClient({
   const [status, setStatus] = useState(user.verificationStatus)
   const [request, setRequest] = useState(initialReq)
 
-  const isApproved = status === "APPROVED"
-  const isPendingReview = status === "PENDING"
-  const isRejected = status === "REJECTED"
+  const isApproved = request?.status === "APPROVED" || status === "APPROVED"
+  const isPendingReview = request?.status === "PENDING"
+  const isRejected = request?.status === "REJECTED"
 
   const handleSubmit = () => {
     startTransition(async () => {
@@ -77,14 +77,14 @@ export function StudentVerifyClient({
       } else {
         toast.success(res.message || "Verification request submitted successfully!")
         setStatus("PENDING")
-        setRequest((prev) => ({
-          id: prev?.id || "new-req",
+        setRequest({
+          id: res.requestId || "new-req",
           status: "PENDING",
           rejectionReason: null,
           createdAt: new Date(),
           updatedAt: new Date(),
           reviewerName: null,
-        }))
+        })
       }
     })
   }
