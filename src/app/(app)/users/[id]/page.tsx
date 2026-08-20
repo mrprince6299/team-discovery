@@ -1,19 +1,20 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { getPublicProfile } from "@/app/actions/profile"
+import { createClient } from "@/utils/supabase/server"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BookmarkButton } from "@/components/bookmarks/bookmark-button"
 import { RatingBreakdownCard } from "@/components/ratings/rating-breakdown-card"
-import { ReviewCard } from "@/components/ratings/review-card"
+import { TechIcon } from "@/components/common/tech-icon"
+import { parseProfileRole, SKILL_LEVEL_OPTIONS } from "@/lib/constants/options"
 import {
   Star,
   Clock,
   ExternalLink,
   Code2,
-  PenTool,
   Globe,
   Trophy,
   Layers,
@@ -22,6 +23,8 @@ import {
   Mail,
   Calendar,
   Building,
+  Briefcase,
+  Edit3,
 } from "lucide-react"
 
 interface PublicProfilePageProps {
@@ -30,11 +33,18 @@ interface PublicProfilePageProps {
 
 export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
   const { id } = await params
-  const profile = await getPublicProfile(id)
+  const [profile, supabase] = await Promise.all([
+    getPublicProfile(id),
+    createClient(),
+  ])
 
   if (!profile) {
     notFound()
   }
+
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  const isOwner = authUser?.id === profile.id
+  const { role: profileRole, cleanBio } = parseProfileRole(profile.bio)
 
   const initials = profile.name
     .split(" ")
@@ -48,13 +58,22 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   return (
     <div className="space-y-8 pb-16 max-w-5xl mx-auto">
       {/* Back navigation */}
-      <div>
+      <div className="flex items-center justify-between">
         <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-          <Link href="/profile">
+          <Link href="/discover">
             <ArrowLeft className="size-3.5" />
-            <span>Back to Profile Editor</span>
+            <span>Back to Discovery</span>
           </Link>
         </Button>
+
+        {isOwner && (
+          <Button asChild size="sm" variant="outline" className="gap-1.5 text-xs font-semibold shadow-2xs">
+            <Link href="/profile">
+              <Edit3 className="size-3.5 text-primary" />
+              <span>Edit My Profile</span>
+            </Link>
+          </Button>
+        )}
       </div>
 
       {/* Hero Header Card */}
@@ -71,8 +90,14 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
               </Avatar>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">{profile.name}</h1>
+                  {profileRole && (
+                    <Badge variant="default" className="text-xs font-semibold bg-primary text-primary-foreground gap-1">
+                      <Briefcase className="size-3" />
+                      <span>{profileRole}</span>
+                    </Badge>
+                  )}
                   <Badge
                     variant={isVerified ? "success" : "outline"}
                     className="text-[10px] uppercase font-semibold"
@@ -85,12 +110,21 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
             </div>
 
             <div className="flex items-center gap-2 self-stretch sm:self-auto">
-              <Button asChild size="sm" className="w-full sm:w-auto gap-1.5 shadow-xs">
-                <Link href={`/discover?candidate=${profile.id}`}>
-                  <Mail className="size-3.5" />
-                  <span>Invite to Team Role</span>
-                </Link>
-              </Button>
+              {isOwner ? (
+                <Button asChild size="sm" className="w-full sm:w-auto gap-1.5 shadow-xs font-semibold">
+                  <Link href="/profile">
+                    <Edit3 className="size-3.5" />
+                    <span>Edit Profile</span>
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild size="sm" className="w-full sm:w-auto gap-1.5 shadow-xs">
+                  <Link href={`/discover?candidate=${profile.id}`}>
+                    <Mail className="size-3.5" />
+                    <span>Invite to Team Role</span>
+                  </Link>
+                </Button>
+              )}
               <BookmarkButton
                 targetType="USER"
                 targetId={profile.id}
@@ -143,247 +177,206 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
         </CardContent>
       </Card>
 
-      {/* Bio / Summary */}
-      {profile.bio && (
-        <Card className="border-border/80 shadow-xs rounded-xl">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              About
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
-              {profile.bio}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      {/* Main Grid: 2 Column Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Left Column (2/3 width): Bio, Skills, Projects */}
+        <div className="md:col-span-2 space-y-8">
+          {/* Bio Section */}
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold">About Candidate</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
+                {cleanBio || "This candidate has not added a bio yet."}
+              </p>
+            </CardContent>
+          </Card>
 
-      {/* Technical Skills & Interests Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Skills */}
-        <Card className="border-border/80 shadow-xs rounded-xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Layers className="size-4 text-primary" />
-              <span>Verified Skills</span>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Primary ranking factors for deterministic role matching.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {profile.skills.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No skills listed.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {profile.skills.map(({ skill, level }) => (
+          {/* Technical Skills Section */}
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-bold flex items-center gap-2">
+                  <Layers className="size-4 text-primary" />
+                  <span>Technical Skills</span>
+                </CardTitle>
+                <span className="text-xs text-muted-foreground font-medium">
+                  {profile.skills.length} skills listed
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {profile.skills.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No technical skills listed.</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {profile.skills.map(({ skill, level }) => {
+                    const levelMeta = SKILL_LEVEL_OPTIONS.find((l) => l.value === level)
+                    return (
+                      <div
+                        key={skill.id}
+                        className="flex items-center justify-between p-2.5 rounded-xl border border-border/80 bg-muted/20"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="size-7 rounded-lg bg-background border border-border flex items-center justify-center shrink-0 shadow-2xs">
+                            <TechIcon name={skill.name} className="size-3.5" />
+                          </div>
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {skill.name}
+                          </span>
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] uppercase tracking-wider font-semibold py-0 px-1.5 ${levelMeta?.color || ""}`}
+                        >
+                          {level}
+                        </Badge>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Projects Portfolio Section */}
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Code2 className="size-4 text-primary" />
+                <span>Portfolio Projects ({profile.projects.length})</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {profile.projects.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No projects added yet.</p>
+              ) : (
+                profile.projects.map((proj) => (
                   <div
-                    key={skill.id}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border/80 bg-muted/20 text-xs"
+                    key={proj.id}
+                    className="p-4 rounded-xl border border-border/80 bg-card space-y-2.5 shadow-2xs"
                   >
-                    <span className="font-semibold text-foreground">{skill.name}</span>
-                    <Badge
-                      variant={
-                        level === "ADVANCED"
-                          ? "exact"
-                          : level === "INTERMEDIATE"
-                          ? "secondary"
-                          : "outline"
-                      }
-                      className="text-[9px] px-1 py-0"
-                    >
-                      {level}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Interests */}
-        <Card className="border-border/80 shadow-xs rounded-xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Sparkles className="size-4 text-primary" />
-              <span>Domain Interests</span>
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Technologies and topics the candidate is eager to work on.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {profile.interests.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic">No interests listed.</p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {profile.interests.map(({ skill }) => (
-                  <Badge key={skill.id} variant="interest" className="text-xs px-2.5 py-0.5">
-                    {skill.name}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Public Projects (Portfolio) */}
-      <Card className="border-border/80 shadow-xs rounded-xl">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-bold">Public Project Portfolio</CardTitle>
-          <CardDescription className="text-xs">
-            Verifiable hackathon builds, production applications, and open-source code.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {profile.projects.length === 0 ? (
-            <div className="text-center py-8 border border-dashed border-border rounded-xl space-y-1">
-              <p className="text-xs text-muted-foreground">No public projects available for this candidate.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {profile.projects.map((project) => (
-                <Card
-                  key={project.id}
-                  className="border-border/80 bg-muted/10 hover:border-border transition-colors rounded-xl flex flex-col justify-between"
-                >
-                  <CardHeader className="pb-2 space-y-1">
                     <div className="flex items-start justify-between gap-2">
-                      <CardTitle className="text-base font-bold text-foreground">
-                        {project.title}
-                      </CardTitle>
-                      <BookmarkButton
-                        targetType="PROJECT"
-                        targetId={project.id}
-                        size="icon"
-                        className="size-7 shrink-0 -mt-1"
-                      />
+                      <div>
+                        <h4 className="font-bold text-sm text-foreground">{proj.title}</h4>
+                        <span className="text-xs text-primary font-medium">{proj.role}</span>
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {new Date(proj.date).toLocaleDateString(undefined, { month: "short", year: "numeric" })}
+                      </span>
                     </div>
-                    <div className="text-xs font-semibold text-primary">{project.role}</div>
-                    <CardDescription className="text-xs leading-relaxed line-clamp-3">
-                      {project.description}
-                    </CardDescription>
-                  </CardHeader>
 
-                  <CardContent className="space-y-3 pb-4">
-                    {/* Project Skills */}
-                    {project.skills.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {project.skills.map(({ skill }) => (
-                          <Badge key={skill.id} variant="secondary" className="text-[10px] px-1.5 py-0">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {proj.description}
+                    </p>
+
+                    {proj.skills.length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {proj.skills.map(({ skill }) => (
+                          <Badge key={skill.id} variant="secondary" className="text-[10px] font-normal py-0">
                             {skill.name}
                           </Badge>
                         ))}
                       </div>
                     )}
 
-                    {/* External Links */}
-                    <div className="flex items-center gap-3 text-xs pt-2 border-t border-border/40">
-                      {project.githubLink && (
+                    <div className="flex items-center gap-4 pt-1 text-xs">
+                      {proj.githubLink && (
                         <a
-                          href={project.githubLink}
+                          href={proj.githubLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-medium"
                         >
                           <Code2 className="size-3.5" />
-                          <span>Code</span>
+                          <span>Code Repository</span>
                         </a>
                       )}
-                      {project.figmaLink && (
+                      {proj.demoLink && (
                         <a
-                          href={project.figmaLink}
+                          href={proj.demoLink}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <PenTool className="size-3.5" />
-                          <span>Figma</span>
-                        </a>
-                      )}
-                      {project.demoLink && (
-                        <a
-                          href={project.demoLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
+                          className="text-primary hover:underline inline-flex items-center gap-1 font-semibold"
                         >
                           <Globe className="size-3.5" />
                           <span>Live Demo</span>
                         </a>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Achievements */}
-      {profile.achievements.length > 0 && (
-        <Card className="border-border/80 shadow-xs rounded-xl">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg font-bold flex items-center gap-2">
-              <Trophy className="size-4 text-amber-500" />
-              <span>Hackathon Awards &amp; Honors</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {profile.achievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                className="flex items-start justify-between p-3.5 rounded-xl border border-border/80 bg-muted/20"
-              >
-                <div className="space-y-1">
-                  <div className="font-bold text-sm text-foreground">{achievement.title}</div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {achievement.description}
-                  </p>
-                  {achievement.link && (
-                    <div className="pt-1">
+        {/* Right Column (1/3 width): Ratings, Interests, Achievements */}
+        <div className="space-y-6">
+          {/* Peer Ratings Breakdown */}
+          <RatingBreakdownCard ratings={profile.ratingsReceived} candidateName={profile.name} />
+
+          {/* Domain Interests */}
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Sparkles className="size-4 text-purple-500" />
+                <span>Interests &amp; Domains</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {profile.interests.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No interests specified.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {profile.interests.map(({ skill }) => (
+                    <Badge
+                      key={skill.id}
+                      variant="outline"
+                      className="text-xs font-medium py-1 px-2.5 bg-muted/40 border-border/80"
+                    >
+                      {skill.name}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Awards & Achievements */}
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold flex items-center gap-2">
+                <Trophy className="size-4 text-amber-500" />
+                <span>Achievements</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {profile.achievements.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No awards listed.</p>
+              ) : (
+                profile.achievements.map((ach) => (
+                  <div key={ach.id} className="p-3 rounded-xl border border-border/70 bg-card space-y-1">
+                    <h5 className="font-bold text-xs text-foreground">{ach.title}</h5>
+                    <p className="text-[11px] text-muted-foreground leading-snug">{ach.description}</p>
+                    {ach.link && (
                       <a
-                        href={achievement.link}
+                        href={ach.link}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        className="text-[10px] text-primary hover:underline inline-flex items-center gap-1 font-semibold pt-1"
                       >
-                        <span>Verified Certificate</span>
-                        <ExternalLink className="size-3" />
+                        <ExternalLink className="size-2.5" />
+                        <span>View Proof</span>
                       </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Peer Reviews & Trust Breakdown */}
-      <div className="space-y-6">
-        <RatingBreakdownCard
-          ratings={profile.ratingsReceived}
-          candidateName={profile.name}
-        />
-
-        {profile.ratingsReceived.length > 0 && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-2">
-              <Star className="size-4 fill-amber-400 text-amber-500" />
-              <span>Individual Peer Reviews ({profile.ratingsReceived.length})</span>
-            </h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {profile.ratingsReceived.map((rating) => (
-                <ReviewCard key={rating.id} rating={rating} />
-              ))}
-            </div>
-          </div>
-        )}
+                    )}
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   )

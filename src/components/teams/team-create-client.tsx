@@ -14,7 +14,8 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
-  HelpCircle,
+  Briefcase,
+  Plus,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,13 +28,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 import { createTeamWithRoles } from "@/app/actions/teams"
 import { toast } from "sonner"
 import type { SkillLevel, PreferredExperience } from "@prisma/client"
 import { RoleCombobox } from "@/components/common/role-combobox"
 import { SearchableSkillSelector } from "@/components/common/searchable-skill-selector"
-import { SKILL_LEVEL_OPTIONS, EXPERIENCE_LEVEL_OPTIONS } from "@/lib/constants/options"
+import { EXPERIENCE_LEVEL_OPTIONS } from "@/lib/constants/options"
 
 interface RoleDraft {
   id: string
@@ -44,6 +44,7 @@ interface RoleDraft {
   expiryDays: number
   requiredSkillIds: string[]
   preferredSkillIds: string[]
+  recommendedSkills?: string[]
 }
 
 interface TeamCreateClientProps {
@@ -61,46 +62,47 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
   const [description, setDescription] = useState("")
   const [selectedEventId, setSelectedEventId] = useState<string>("NONE")
 
-  // Roles Drafts
-  const [roles, setRoles] = useState<RoleDraft[]>([
-    {
-      id: "role-1",
-      name: "Frontend Developer",
-      seatsRequired: 1,
-      preferredLevel: "INTERMEDIATE",
-      preferredExperience: "SOME_EXPERIENCE",
-      expiryDays: 7,
-      requiredSkillIds: [],
-      preferredSkillIds: [],
-    },
-  ])
+  // Roles Drafts — Starts empty; leader explicitly chooses roles to add
+  const [roles, setRoles] = useState<RoleDraft[]>([])
 
   const handleAddRole = () => {
     setRoles((prev) => [
       ...prev,
       {
         id: `role-${Date.now()}`,
-        name: "Backend Developer",
+        name: "",
         seatsRequired: 1,
         preferredLevel: "INTERMEDIATE",
         preferredExperience: "ANY",
         expiryDays: 7,
         requiredSkillIds: [],
         preferredSkillIds: [],
+        recommendedSkills: [],
       },
     ])
   }
 
   const handleRemoveRole = (roleId: string) => {
-    if (roles.length <= 1) {
-      toast.error("A team must have at least one recruitment role.")
-      return
-    }
     setRoles((prev) => prev.filter((r) => r.id !== roleId))
   }
 
   const handleUpdateRole = (roleId: string, updates: Partial<RoleDraft>) => {
     setRoles((prev) => prev.map((r) => (r.id === roleId ? { ...r, ...updates } : r)))
+  }
+
+  const handleAddSuggestedSkill = (roleId: string, skillName: string, isRequired: boolean = true) => {
+    setRoles((prev) =>
+      prev.map((r) => {
+        if (r.id !== roleId) return r
+        if (isRequired) {
+          if (r.requiredSkillIds.includes(skillName)) return r
+          return { ...r, requiredSkillIds: [...r.requiredSkillIds, skillName] }
+        } else {
+          if (r.preferredSkillIds.includes(skillName)) return r
+          return { ...r, preferredSkillIds: [...r.preferredSkillIds, skillName] }
+        }
+      })
+    )
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -114,6 +116,11 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
 
     if (!description.trim()) {
       setErrorMessage("Please provide a team description or mission statement.")
+      return
+    }
+
+    if (roles.length === 0) {
+      setErrorMessage("Please add at least one recruitment role for your team.")
       return
     }
 
@@ -138,9 +145,9 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
         expiry.setDate(expiry.getDate() + r.expiryDays)
         return {
           name: r.name.trim(),
-          seatsRequired: Number(r.seatsRequired),
-          preferredLevel: r.preferredLevel,
-          preferredExperience: r.preferredExperience,
+          seatsRequired: r.seatsRequired,
+          preferredLevel: r.preferredLevel || "INTERMEDIATE",
+          preferredExperience: r.preferredExperience || "ANY",
           expiry,
           requiredSkillIds: r.requiredSkillIds,
           preferredSkillIds: r.preferredSkillIds,
@@ -156,7 +163,6 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
 
       if (res.error) {
         setErrorMessage(res.error)
-        toast.error(res.error)
       } else if (res.teamId) {
         toast.success("Team created successfully with recruitment roles!")
         router.push(`/teams/${res.teamId}`)
@@ -165,10 +171,10 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
   }
 
   return (
-    <div className="space-y-6 pb-20 max-w-4xl mx-auto">
-      {/* Back Link */}
-      <div className="flex items-center gap-2">
-        <Button asChild variant="ghost" size="sm" className="gap-1 text-xs text-muted-foreground">
+    <div className="max-w-4xl mx-auto space-y-8 pb-16">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs text-muted-foreground hover:text-foreground">
           <Link href="/teams">
             <ArrowLeft className="size-3.5" />
             <span>Back to Teams</span>
@@ -176,317 +182,339 @@ export function TeamCreateClient({ events, availableSkills }: TeamCreateClientPr
         </Button>
       </div>
 
-      <div className="space-y-1 border-b border-border/60 pb-4">
-        <div className="inline-flex items-center gap-2 text-xs font-semibold text-primary">
-          <Sparkles className="size-3.5" />
-          <span>Team Builder Studio</span>
-        </div>
+      <div className="space-y-1">
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-          Create a New Team
+          Create New Squad
         </h1>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          Establish your squad, associate with an upcoming hackathon, and publish recruitment roles with verified skill requirements.
+          Form a hackathon team, define the specific roles you need, and recruit peers with deterministic skill-matching.
         </p>
       </div>
 
+      {errorMessage && (
+        <div
+          role="alert"
+          className="flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-xs font-medium text-destructive"
+        >
+          <AlertCircle className="size-4 shrink-0 mt-0.5" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* SECTION 1: TEAM DETAILS */}
-        <Card className="border-border/80 bg-card rounded-2xl shadow-xs">
-          <CardHeader className="p-5 pb-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Users className="size-4 text-primary" />
-              <span>Team Profile & Event</span>
+        {/* Step 1: Team Details */}
+        <Card className="border-border/80 bg-card shadow-sm rounded-2xl">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Users className="size-5 text-primary" />
+              <span>Squad Identity &amp; Target Event</span>
             </CardTitle>
             <CardDescription className="text-xs">
-              Basic team information visible to candidates browsing the catalog.
+              Give your squad a memorable name and describe the problem you aim to solve.
             </CardDescription>
           </CardHeader>
-
-          <CardContent className="p-5 pt-2 space-y-4">
-            {/* Team Name */}
+          <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label htmlFor="team-name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Team Name *
               </label>
               <Input
+                id="team-name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Neural Builders, FinTech Pioneers..."
-                className="h-10 text-sm font-medium"
+                placeholder="e.g. Neural Pioneers, Quantum Builders, DevDynasty"
                 required
                 disabled={isPending}
+                className="h-10 rounded-xl"
               />
             </div>
 
-            {/* Event Association */}
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+              <label htmlFor="team-desc" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Team Mission &amp; Description *
+              </label>
+              <Textarea
+                id="team-desc"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe your hackathon idea, project goals, and what kind of collaborators you are looking for..."
+                rows={3}
+                required
+                disabled={isPending}
+                className="rounded-xl"
+              />
+            </div>
+
+            {/* Event Selector */}
+            <div className="space-y-1.5 pt-1">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <Calendar className="size-3.5 text-primary" />
-                <span>Associated Event / Hackathon (Optional)</span>
+                <span>Associated Event (Optional)</span>
               </label>
               <Select
                 value={selectedEventId}
                 onValueChange={setSelectedEventId}
                 disabled={isPending}
               >
-                <SelectTrigger className="h-10 text-xs">
-                  <SelectValue placeholder="Select Event..." />
+                <SelectTrigger className="w-full h-10 rounded-xl">
+                  <SelectValue placeholder="Select an active hackathon event..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="NONE">Independent / General Project</SelectItem>
-                  {events.map((evt) => (
-                    <SelectItem key={evt.id} value={evt.id}>
-                      {evt.name}
+                  <SelectItem value="NONE">General / Independent Project (No Event)</SelectItem>
+                  {events.map((ev) => (
+                    <SelectItem key={ev.id} value={ev.id}>
+                      {ev.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-
-            {/* Team Description */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-                <span>Team Mission & Project Idea *</span>
-                <span className="text-[10px] text-muted-foreground font-normal">{description.length}/500</span>
-              </label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={500}
-                placeholder="Briefly describe what your team aims to build, target problem, and work style..."
-                className="min-h-[100px] text-xs resize-none"
-                required
-                disabled={isPending}
-              />
-            </div>
           </CardContent>
         </Card>
 
-        {/* SECTION 2: ROLE BUILDER */}
+        {/* Step 2: Open Recruitment Roles */}
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <h2 className="text-lg font-bold text-foreground flex items-center gap-2">
-                <Layers className="size-4 text-emerald-500" />
-                <span>Initial Recruitment Roles</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                <Briefcase className="size-5 text-primary" />
+                <span>Recruitment Roles ({roles.length})</span>
               </h2>
               <p className="text-xs text-muted-foreground">
-                Define the specific skills and seats required. Each role must specify at least one required skill.
+                Add the specific roles and required skills your squad needs to fill.
               </p>
             </div>
-
             <Button
               type="button"
-              variant="outline"
-              size="sm"
               onClick={handleAddRole}
               disabled={isPending}
-              className="gap-1.5 text-xs font-semibold shadow-xs"
+              variant="outline"
+              size="sm"
+              className="gap-1.5 font-semibold shadow-2xs rounded-xl self-start sm:self-auto border-primary/30 hover:bg-primary/10 text-primary"
             >
-              <PlusCircle className="size-3.5" />
-              <span>Add Another Role</span>
+              <PlusCircle className="size-4" />
+              <span>Add Role</span>
             </Button>
           </div>
 
-          <div className="space-y-4">
-            {roles.map((role, index) => (
-              <Card key={role.id} className="border-border/80 bg-card rounded-2xl shadow-xs overflow-hidden">
-                <div className="p-4 bg-muted/20 border-b border-border/60 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="exact" className="text-[10px] font-bold">
-                      Role #{index + 1}
-                    </Badge>
-                    <span className="font-bold text-sm text-foreground">{role.name || "Untitled Role"}</span>
-                  </div>
-
-                  {roles.length > 1 && (
+          {roles.length === 0 ? (
+            <Card className="border-2 border-dashed border-border/70 rounded-2xl bg-muted/20 text-center py-10">
+              <CardContent className="space-y-3">
+                <Briefcase className="size-10 text-muted-foreground mx-auto opacity-50" />
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-foreground">No roles added yet</h3>
+                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                    Click &quot;Add Role&quot; above to select standard disciplines like Frontend, Backend, AI/ML, or Design.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleAddRole}
+                  className="gap-1.5 font-semibold shadow-xs"
+                >
+                  <Plus className="size-4" />
+                  <span>Add First Role</span>
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {roles.map((role, idx) => (
+                <Card key={role.id} className="border-border/80 bg-card shadow-sm rounded-2xl relative overflow-hidden">
+                  <div className="p-4 bg-muted/30 border-b border-border/60 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-6 items-center justify-center rounded-lg bg-primary/15 text-primary font-bold text-xs">
+                        {idx + 1}
+                      </span>
+                      <span className="font-bold text-sm text-foreground">
+                        {role.name ? role.name : "New Recruitment Role"}
+                      </span>
+                    </div>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveRole(role.id)}
                       disabled={isPending}
-                      className="h-7 px-2 text-xs text-destructive hover:bg-destructive/10 gap-1"
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-8 px-2 text-xs"
                     >
-                      <Trash2 className="size-3.5" />
+                      <Trash2 className="size-3.5 mr-1" />
                       <span>Remove</span>
                     </Button>
-                  )}
-                </div>
+                  </div>
 
-                <CardContent className="p-5 space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Role Title */}
-                    <div className="space-y-1.5 sm:col-span-2">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  <CardContent className="p-5 space-y-4">
+                    {/* Role Title with Authoritative Suggestions */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Role Title *
                       </label>
                       <RoleCombobox
                         value={role.name}
-                        onChange={(val, suggestedSkills) => {
-                          const updates: Partial<RoleDraft> = { name: val }
-                          if (suggestedSkills && suggestedSkills.length > 0) {
-                            const existing = role.requiredSkillIds
-                            const newSkills = suggestedSkills.map((sName) => {
-                              const found = availableSkills.find((s) => s.name.toLowerCase() === sName.toLowerCase())
-                              return found ? found.id : sName
-                            })
-                            updates.requiredSkillIds = Array.from(new Set([...existing, ...newSkills]))
-                          }
-                          handleUpdateRole(role.id, updates)
+                        onChange={(roleName, suggestedSkills) => {
+                          handleUpdateRole(role.id, {
+                            name: roleName,
+                            recommendedSkills: suggestedSkills || [],
+                          })
                         }}
                         disabled={isPending}
-                        placeholder="e.g. Lead Frontend Engineer, AI Researcher..."
+                        placeholder="Select a standard role or enter custom title..."
                       />
                     </div>
 
-                    {/* Seats Required */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Seats Required *
-                      </label>
-                      <Input
-                        type="number"
-                        min={1}
-                        max={10}
-                        value={role.seatsRequired}
-                        onChange={(e) =>
-                          handleUpdateRole(role.id, { seatsRequired: Math.max(1, parseInt(e.target.value) || 1) })
+                    {/* Recommended Skills (Suggestive Chips) */}
+                    {role.recommendedSkills && role.recommendedSkills.length > 0 && (
+                      <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 space-y-1.5">
+                        <div className="text-[11px] font-semibold text-primary flex items-center gap-1.5">
+                          <Sparkles className="size-3.5" />
+                          <span>Recommended skills for {role.name} (click to add):</span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {role.recommendedSkills.map((skillName) => {
+                            const isAdded =
+                              role.requiredSkillIds.includes(skillName) ||
+                              role.preferredSkillIds.includes(skillName)
+                            return (
+                              <button
+                                key={skillName}
+                                type="button"
+                                disabled={isAdded}
+                                onClick={() => handleAddSuggestedSkill(role.id, skillName, true)}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                                  isAdded
+                                    ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 opacity-60 cursor-default"
+                                    : "border-primary/30 bg-background hover:bg-primary/10 text-foreground hover:border-primary shadow-2xs"
+                                }`}
+                              >
+                                {isAdded ? `✓ ${skillName}` : `+ ${skillName}`}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seats & Experience */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Seats Needed
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={10}
+                          value={role.seatsRequired}
+                          onChange={(e) =>
+                            handleUpdateRole(role.id, {
+                              seatsRequired: parseInt(e.target.value, 10) || 1,
+                            })
+                          }
+                          disabled={isPending}
+                          className="h-10 rounded-xl"
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Experience Level Preference
+                        </label>
+                        <Select
+                          value={role.preferredExperience || "ANY"}
+                          onValueChange={(val) =>
+                            handleUpdateRole(role.id, {
+                              preferredExperience: val as PreferredExperience,
+                            })
+                          }
+                          disabled={isPending}
+                        >
+                          <SelectTrigger className="w-full h-10 rounded-xl">
+                            <SelectValue placeholder="Select experience..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Required Skills (Multi-Select) */}
+                    <div className="space-y-1.5 pt-2 border-t border-border/60">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                          <Layers className="size-3.5 text-primary" />
+                          <span>Required Skills * (Exact Match Filter)</span>
+                        </label>
+                        <span className="text-[11px] text-muted-foreground">
+                          {role.requiredSkillIds.length} selected
+                        </span>
+                      </div>
+                      <SearchableSkillSelector
+                        isMultiSelect
+                        selectedSkills={role.requiredSkillIds}
+                        onSelectedSkillsChange={(skills) =>
+                          handleUpdateRole(role.id, { requiredSkillIds: skills })
                         }
-                        className="h-9 text-xs font-semibold"
-                        required
-                        disabled={isPending}
+                        availableSkills={availableSkills}
+                        placeholder="Add required technical skills for this role..."
                       />
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-border/50">
-                    {/* Preferred Level */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Preferred Skill Level
-                      </label>
-                      <Select
-                        value={role.preferredLevel || "INTERMEDIATE"}
-                        onValueChange={(val: SkillLevel) => handleUpdateRole(role.id, { preferredLevel: val })}
-                        disabled={isPending}
-                      >
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SKILL_LEVEL_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    {/* Preferred Experience */}
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                        Preferred Experience
-                      </label>
-                      <Select
-                        value={role.preferredExperience || "ANY"}
-                        onValueChange={(val: PreferredExperience) =>
-                          handleUpdateRole(role.id, { preferredExperience: val })
-                        }
-                        disabled={isPending}
-                      >
-                        <SelectTrigger className="h-9 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {EXPERIENCE_LEVEL_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Required Skill Tag Selector */}
-                  <div className="space-y-2 pt-2 border-t border-border/50">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                        <span>Select Required Skills *</span>
-                        <span className="text-[10px] font-normal">
-                          ({role.requiredSkillIds.length} selected)
+                    {/* Preferred Skills */}
+                    <div className="space-y-1.5 pt-2 border-t border-border/60">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                          <Sparkles className="size-3.5 text-amber-500" />
+                          <span>Preferred / Bonus Skills (Optional)</span>
+                        </label>
+                        <span className="text-[11px] text-muted-foreground">
+                          {role.preferredSkillIds.length} selected
                         </span>
-                      </label>
-                      {role.requiredSkillIds.length === 0 && (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">
-                          At least 1 skill required
-                        </span>
-                      )}
-                    </div>
-
-                    <SearchableSkillSelector
-                      availableSkills={availableSkills}
-                      selectedSkillIds={role.requiredSkillIds}
-                      onSelectSkill={(skill) => {
-                        const id = skill.id.startsWith('auth-') ? skill.name : skill.id
-                        if (!role.requiredSkillIds.includes(id)) {
-                          handleUpdateRole(role.id, {
-                            requiredSkillIds: [...role.requiredSkillIds, id],
-                          })
+                      </div>
+                      <SearchableSkillSelector
+                        isMultiSelect
+                        selectedSkills={role.preferredSkillIds}
+                        onSelectedSkillsChange={(skills) =>
+                          handleUpdateRole(role.id, { preferredSkillIds: skills })
                         }
-                      }}
-                      onRemoveSkill={(id) => {
-                        handleUpdateRole(role.id, {
-                          requiredSkillIds: role.requiredSkillIds.filter((sid) => sid !== id),
-                        })
-                      }}
-                      placeholder="Search and select required skills for this role..."
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                        excludeSkills={role.requiredSkillIds}
+                        availableSkills={availableSkills}
+                        placeholder="Add preferred bonus skills (e.g. GraphQL, Tailwind)..."
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Error Banner */}
-        {errorMessage && (
-          <div
-            role="alert"
-            className="flex items-start gap-2 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive font-semibold"
+        {/* Submit Buttons */}
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-border/60">
+          <Button asChild variant="outline" className="h-10 px-5 rounded-xl">
+            <Link href="/teams">Cancel</Link>
+          </Button>
+          <Button
+            type="submit"
+            disabled={isPending || roles.length === 0}
+            className="h-10 px-6 gap-2 font-semibold shadow-xs rounded-xl"
           >
-            <AlertCircle className="size-4 shrink-0 mt-0.5" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-
-        {/* Submit Actions */}
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-border/60">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <HelpCircle className="size-3.5 text-muted-foreground shrink-0" />
-            <span>You will automatically become the active Team Leader upon creation.</span>
-          </div>
-
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Button asChild variant="outline" size="default" disabled={isPending} className="w-full sm:w-auto">
-              <Link href="/teams">Cancel</Link>
-            </Button>
-            <Button type="submit" size="default" disabled={isPending} className="gap-2 font-bold shadow-xs w-full sm:w-auto">
-              {isPending ? (
-                <>
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>Publishing Team...</span>
-                </>
-              ) : (
-                <>
-                  <PlusCircle className="size-4" />
-                  <span>Create Team & Open Recruitment</span>
-                </>
-              )}
-            </Button>
-          </div>
+            {isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                <span>Creating Squad...</span>
+              </>
+            ) : (
+              <>
+                <Users className="size-4" />
+                <span>Create Squad &amp; Open Roles</span>
+              </>
+            )}
+          </Button>
         </div>
       </form>
     </div>

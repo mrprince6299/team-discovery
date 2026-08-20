@@ -15,17 +15,21 @@ import {
   Trash2,
   ExternalLink,
   Code2,
-  PenTool,
   Globe,
-  Lock,
   Eye,
   Loader2,
   Save,
   Clock,
+  Briefcase,
+  GraduationCap,
+  Building,
+  ArrowRight,
+  ShieldCheck,
+  Edit3,
 } from "lucide-react"
 import {
   updateBasicProfile,
-  addUserSkill,
+  addUserSkillsBatch,
   removeUserSkill,
   addUserInterest,
   removeUserInterest,
@@ -60,12 +64,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { SearchableSkillSelector } from "@/components/common/searchable-skill-selector"
+import { RoleCombobox } from "@/components/common/role-combobox"
+import { TechIcon } from "@/components/common/tech-icon"
 import {
   AUTHORITATIVE_INTERESTS,
   ACADEMIC_YEAR_OPTIONS,
   AVAILABILITY_OPTIONS,
   SKILL_LEVEL_OPTIONS,
-  AUTHORITATIVE_DEPARTMENTS,
+  AUTHORITATIVE_PROGRAMS,
+  getBranchesForProgram,
+  parseProfileRole,
 } from "@/lib/constants/options"
 
 interface ProfileEditorClientProps {
@@ -94,7 +102,7 @@ interface ProfileEditorClientProps {
       title: string
       description: string
       role: string
-      date: Date
+      date: Date | string
       githubLink: string | null
       figmaLink: string | null
       demoLink: string | null
@@ -105,7 +113,7 @@ interface ProfileEditorClientProps {
       id: string
       title: string
       description: string
-      date: Date
+      date: Date | string
       link: string | null
     }>
     stats: {
@@ -114,7 +122,7 @@ interface ProfileEditorClientProps {
     }
   }
   availableSkills: Array<{ id: string; name: string }>
-  colleges: Array<{
+  colleges?: Array<{
     id: string
     name: string
     departments: Array<{ id: string; name: string }>
@@ -124,28 +132,70 @@ interface ProfileEditorClientProps {
 export function ProfileEditorClient({
   initialProfile,
   availableSkills,
-  colleges,
 }: ProfileEditorClientProps) {
   const [profile, setProfile] = useState(initialProfile)
   const [isPending, startTransition] = useTransition()
 
-  // Basic Form State
+  // Parse Role & Bio from Bio string
+  const { role: initialRole, cleanBio: initialCleanBio } = parseProfileRole(profile.bio)
+  const [role, setRole] = useState<string>(initialRole || "")
   const [name, setName] = useState(profile.name)
-  const [bio, setBio] = useState(profile.bio || "")
+  const [bio, setBio] = useState(initialCleanBio)
   const [year, setYear] = useState<string>(profile.year ? String(profile.year) : "")
   const [availability, setAvailability] = useState<Availability>(profile.availability)
-  const [collegeId, setCollegeId] = useState<string>(profile.collegeId || "")
-  const [departmentId, setDepartmentId] = useState<string>(profile.departmentId || "")
+  const [collegeName, setCollegeName] = useState<string>(profile.college?.name || "")
   const [profilePhoto, setProfilePhoto] = useState(profile.profilePhoto || "")
 
-  // Modal Dialog States
+  // Parse Program & Branch from Department name
+  const initialDeptName = profile.department?.name || ""
+  let initialProg = "B.Tech / B.E."
+  let initialBranch = "Computer Science and Engineering (CSE)"
+
+  if (initialDeptName.includes(" - ")) {
+    const parts = initialDeptName.split(" - ")
+    const pFound = AUTHORITATIVE_PROGRAMS.find((p) => p.name === parts[0].trim())
+    if (pFound) {
+      initialProg = pFound.name
+      initialBranch = parts.slice(1).join(" - ").trim()
+    }
+  } else if (initialDeptName) {
+    const pFound = AUTHORITATIVE_PROGRAMS.find((p) => p.name === initialDeptName)
+    if (pFound) {
+      initialProg = pFound.name
+      initialBranch = pFound.branches[0] || "General"
+    } else {
+      for (const p of AUTHORITATIVE_PROGRAMS) {
+        if (p.branches.some((b) => b.toLowerCase() === initialDeptName.toLowerCase())) {
+          initialProg = p.name
+          initialBranch = initialDeptName
+          break
+        }
+      }
+    }
+  }
+
+  const [program, setProgram] = useState<string>(initialProg)
+  const [branch, setBranch] = useState<string>(initialBranch)
+
+  // When Program changes, update available branch list
+  const availableBranches = getBranchesForProgram(program)
+
+  const handleProgramChange = (newProg: string) => {
+    setProgram(newProg)
+    const branches = getBranchesForProgram(newProg)
+    setBranch(branches[0] || "General")
+  }
+
+  // Multi-Select Skill Modal States
   const [isAddSkillOpen, setIsAddSkillOpen] = useState(false)
-  const [selectedSkillId, setSelectedSkillId] = useState("")
+  const [selectedSkillNames, setSelectedSkillNames] = useState<string[]>([])
   const [selectedSkillLevel, setSelectedSkillLevel] = useState<SkillLevel>("INTERMEDIATE")
 
+  // Interest Modal States
   const [isAddInterestOpen, setIsAddInterestOpen] = useState(false)
   const [selectedInterestSkillId, setSelectedInterestSkillId] = useState("")
 
+  // Project Modal States
   const [isAddProjectOpen, setIsAddProjectOpen] = useState(false)
   const [projectTitle, setProjectTitle] = useState("")
   const [projectDescription, setProjectDescription] = useState("")
@@ -157,20 +207,18 @@ export function ProfileEditorClient({
   const [projectIsPrivate, setProjectIsPrivate] = useState(false)
   const [projectSelectedSkillIds, setProjectSelectedSkillIds] = useState<string[]>([])
 
+  // Achievement Modal States
   const [isAddAchievementOpen, setIsAddAchievementOpen] = useState(false)
   const [achievementTitle, setAchievementTitle] = useState("")
   const [achievementDescription, setAchievementDescription] = useState("")
   const [achievementDate, setAchievementDate] = useState("")
   const [achievementLink, setAchievementLink] = useState("")
 
-  // Available departments based on selected college
-  const selectedCollege = colleges.find((c) => c.id === collegeId)
-  const departments = selectedCollege ? selectedCollege.departments : []
-
   // Profile Completion Percentage
   const checks = [
-    { label: "Basic Info (Name & Bio)", completed: Boolean(profile.name && profile.bio) },
-    { label: "Academic Info (Year & Department)", completed: Boolean(profile.year && profile.departmentId) },
+    { label: "Basic Info (Name & Bio)", completed: Boolean(profile.name && bio) },
+    { label: "Primary Role", completed: Boolean(role) },
+    { label: "Academic Info (Program & Branch)", completed: Boolean(program && branch) },
     { label: "Skills (At least 1)", completed: profile.skills.length > 0 },
     { label: "Interests (At least 1)", completed: profile.interests.length > 0 },
     { label: "Projects (At least 1)", completed: profile.projects.length > 0 },
@@ -184,45 +232,69 @@ export function ProfileEditorClient({
       const res = await updateBasicProfile({
         name,
         bio,
+        role,
         availability,
         year: year ? parseInt(year, 10) : null,
-        collegeId: collegeId || null,
-        departmentId: departmentId || null,
+        collegeName: collegeName || null,
+        programName: program || null,
+        branchName: branch || null,
         profilePhoto: profilePhoto || null,
       })
 
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Profile basic information updated successfully!")
+        toast.success("Profile information updated successfully!")
+        setProfile((prev) => ({
+          ...prev,
+          name,
+          bio: res.user?.bio || null,
+          year: year ? parseInt(year, 10) : null,
+          availability,
+          department: { id: res.user?.departmentId || "dept", name: `${program} - ${branch}` },
+          college: collegeName ? { id: res.user?.collegeId || "col", name: collegeName } : null,
+        }))
       }
     })
   }
 
-  // 2. Add Skill Submit
-  const handleAddSkill = () => {
-    if (!selectedSkillId) {
-      toast.error("Please select a skill to add")
+  // 2. Add Skills Multi-Select Submit
+  const handleAddSkillsBatch = () => {
+    if (selectedSkillNames.length === 0) {
+      toast.error("Please select at least one skill to add")
       return
     }
 
     startTransition(async () => {
-      const res = await addUserSkill(selectedSkillId, selectedSkillLevel)
+      const batch = selectedSkillNames.map((skillName) => ({
+        skillIdOrName: skillName,
+        level: selectedSkillLevel,
+      }))
+
+      const res = await addUserSkillsBatch(batch)
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Skill added to profile!")
-        const skillName = availableSkills.find((s) => s.id === selectedSkillId)?.name || selectedSkillId
-        const newId = res.skillId || selectedSkillId
+        toast.success(`Added ${res.addedCount} skill${res.addedCount === 1 ? "" : "s"} to your profile!`)
+        
+        const newlyAdded = selectedSkillNames.map((sName) => {
+          const match = availableSkills.find((a) => a.name.toLowerCase() === sName.toLowerCase())
+          return {
+            level: selectedSkillLevel,
+            skill: { id: match ? match.id : `new-${sName}`, name: sName },
+          }
+        })
+
+        const filteredExisting = profile.skills.filter(
+          (s) => !selectedSkillNames.some((n) => n.toLowerCase() === s.skill.name.toLowerCase())
+        )
+
         setProfile((prev) => ({
           ...prev,
-          skills: [
-            ...prev.skills.filter((s) => s.skill.name.toLowerCase() !== skillName.toLowerCase()),
-            { level: selectedSkillLevel, skill: { id: newId, name: skillName } },
-          ],
+          skills: [...filteredExisting, ...newlyAdded],
         }))
         setIsAddSkillOpen(false)
-        setSelectedSkillId("")
+        setSelectedSkillNames([])
       }
     })
   }
@@ -289,8 +361,8 @@ export function ProfileEditorClient({
 
   // 6. Create Project Submit
   const handleCreateProject = () => {
-    if (!projectTitle || !projectDescription || !projectRole) {
-      toast.error("Title, description, and role are required")
+    if (!projectTitle.trim() || !projectDescription.trim() || !projectRole.trim() || !projectDate) {
+      toast.error("Title, role, description, and completion date are required")
       return
     }
 
@@ -299,10 +371,10 @@ export function ProfileEditorClient({
         title: projectTitle,
         description: projectDescription,
         role: projectRole,
-        date: projectDate || new Date().toISOString(),
-        githubLink: projectGithub || null,
-        figmaLink: projectFigma || null,
-        demoLink: projectDemo || null,
+        date: projectDate,
+        githubLink: projectGithub || undefined,
+        figmaLink: projectFigma || undefined,
+        demoLink: projectDemo || undefined,
         isPrivate: projectIsPrivate,
         skillIds: projectSelectedSkillIds,
       })
@@ -311,18 +383,6 @@ export function ProfileEditorClient({
         toast.error(res.error)
       } else {
         toast.success("Project added to portfolio!")
-        if (res.project) {
-          const newProj = {
-            ...res.project,
-            skills: projectSelectedSkillIds.map((sid) => ({
-              skill: availableSkills.find((s) => s.id === sid) || { id: sid, name: "Skill" },
-            })),
-          }
-          setProfile((prev) => ({
-            ...prev,
-            projects: [newProj, ...prev.projects],
-          }))
-        }
         setIsAddProjectOpen(false)
         setProjectTitle("")
         setProjectDescription("")
@@ -333,6 +393,12 @@ export function ProfileEditorClient({
         setProjectDemo("")
         setProjectIsPrivate(false)
         setProjectSelectedSkillIds([])
+        if (res.project) {
+          setProfile((prev) => ({
+            ...prev,
+            projects: [res.project as any, ...prev.projects],
+          }))
+        }
       }
     })
   }
@@ -344,7 +410,7 @@ export function ProfileEditorClient({
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Project deleted")
+        toast.success("Project removed")
         setProfile((prev) => ({
           ...prev,
           projects: prev.projects.filter((p) => p.id !== projectId),
@@ -355,8 +421,8 @@ export function ProfileEditorClient({
 
   // 8. Create Achievement Submit
   const handleCreateAchievement = () => {
-    if (!achievementTitle || !achievementDescription) {
-      toast.error("Title and description are required")
+    if (!achievementTitle.trim() || !achievementDescription.trim() || !achievementDate) {
+      toast.error("Title, description, and date are required")
       return
     }
 
@@ -364,25 +430,25 @@ export function ProfileEditorClient({
       const res = await createAchievement({
         title: achievementTitle,
         description: achievementDescription,
-        date: achievementDate || new Date().toISOString(),
-        link: achievementLink || null,
+        date: achievementDate,
+        link: achievementLink || undefined,
       })
 
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Achievement added!")
-        if (res.achievement) {
-          setProfile((prev) => ({
-            ...prev,
-            achievements: [res.achievement!, ...prev.achievements],
-          }))
-        }
+        toast.success("Achievement recorded!")
         setIsAddAchievementOpen(false)
         setAchievementTitle("")
         setAchievementDescription("")
         setAchievementDate("")
         setAchievementLink("")
+        if (res.achievement) {
+          setProfile((prev) => ({
+            ...prev,
+            achievements: [res.achievement as any, ...prev.achievements],
+          }))
+        }
       }
     })
   }
@@ -394,7 +460,7 @@ export function ProfileEditorClient({
       if (res.error) {
         toast.error(res.error)
       } else {
-        toast.success("Achievement deleted")
+        toast.success("Achievement removed")
         setProfile((prev) => ({
           ...prev,
           achievements: prev.achievements.filter((a) => a.id !== achievementId),
@@ -404,150 +470,151 @@ export function ProfileEditorClient({
   }
 
   const initials = profile.name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2)
+    ? profile.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
+    : "U"
 
   return (
     <div className="space-y-8 pb-16 max-w-5xl mx-auto">
-      {/* Profile Header Card */}
+      {/* Top Header & Public View Action */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
+              Edit Profile
+            </h1>
+            <Badge variant="outline" className="gap-1 text-[11px] font-semibold text-primary border-primary/30 bg-primary/10">
+              <Edit3 className="size-3" />
+              <span>Profile Settings</span>
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Manage your candidate presence, technical skills, academic degree, and project portfolio.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Button asChild variant="outline" size="sm" className="gap-1.5 shadow-2xs font-semibold">
+            <Link href={`/users/${profile.id}`}>
+              <Eye className="size-4 text-primary" />
+              <span>View Public Profile</span>
+              <ArrowRight className="size-3.5 text-muted-foreground" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Hero Overview Card */}
       <Card className="border-border/80 bg-card shadow-sm rounded-2xl overflow-hidden">
         <div className="h-28 bg-gradient-to-r from-primary/20 via-emerald-500/10 to-blue-500/20" />
         <CardContent className="relative px-6 pb-6 pt-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-12">
             <div className="flex items-end gap-4">
               <Avatar className="size-24 rounded-2xl border-4 border-background shadow-md">
-                <AvatarImage src={profilePhoto || undefined} alt={profile.name} />
-                <AvatarFallback className="rounded-2xl text-xl font-bold bg-muted">
+                <AvatarImage src={profilePhoto || profile.profilePhoto || undefined} alt={profile.name} />
+                <AvatarFallback className="rounded-2xl text-2xl font-bold bg-muted">
                   {initials}
                 </AvatarFallback>
               </Avatar>
 
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-2xl font-bold tracking-tight text-foreground">{profile.name}</h1>
-                  <Badge
-                    variant={profile.verificationStatus === "APPROVED" ? "success" : "outline"}
-                    className="text-[10px] uppercase font-semibold"
-                  >
-                    {profile.verificationStatus === "APPROVED" ? "Verified Student" : "Pending Verification"}
-                  </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+                    {name || profile.name}
+                  </h2>
+                  {role && (
+                    <Badge variant="default" className="text-xs font-semibold bg-primary text-primary-foreground gap-1">
+                      <Briefcase className="size-3" />
+                      <span>{role}</span>
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground font-medium">@{profile.username}</p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-stretch sm:self-auto">
-              <Button asChild variant="outline" size="sm" className="w-full sm:w-auto gap-1.5 text-xs">
-                <Link href={`/users/${profile.id}`}>
-                  <Eye className="size-3.5" />
-                  <span>View Public Profile</span>
-                </Link>
-              </Button>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
+                <ShieldCheck className="size-3.5 mr-1" />
+                <span>Beta Active</span>
+              </Badge>
             </div>
           </div>
 
-          {/* Quick Stats & Badges */}
-          <div className="mt-6 pt-4 border-t border-border/60 grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
-            <div>
-              <span className="text-muted-foreground block">Availability</span>
-              <span className="font-semibold text-foreground mt-0.5 inline-flex items-center gap-1">
-                <Clock className="size-3.5 text-emerald-500" />
-                {availability.replace(/_/g, " ")}
+          {/* Profile Completion Bar */}
+          <div className="mt-6 pt-4 border-t border-border/60 space-y-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="font-semibold text-foreground flex items-center gap-1.5">
+                <Sparkles className="size-3.5 text-primary" />
+                <span>Profile Strength</span>
               </span>
+              <span className="font-mono font-bold text-primary">{completionPercentage}%</span>
             </div>
-            <div>
-              <span className="text-muted-foreground block">Academic Year</span>
-              <span className="font-semibold text-foreground mt-0.5 block">
-                {profile.year ? `Year ${profile.year}` : "Not set"}
-              </span>
+            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full bg-primary transition-all duration-500 rounded-full"
+                style={{ width: `${completionPercentage}%` }}
+              />
             </div>
-            <div>
-              <span className="text-muted-foreground block">Verified Skills</span>
-              <span className="font-semibold text-foreground mt-0.5 block">
-                {profile.skills.length} added
-              </span>
-            </div>
-            <div>
-              <span className="text-muted-foreground block">Projects</span>
-              <span className="font-semibold text-foreground mt-0.5 block">
-                {profile.projects.length} in portfolio
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Profile Completion Bar */}
-      <Card className="border-border/80 bg-muted/20 shadow-xs rounded-xl">
-        <CardContent className="p-4 space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-semibold text-foreground flex items-center gap-1.5">
-              <Sparkles className="size-4 text-primary" />
-              <span>Profile Completion</span>
-            </span>
-            <span className="font-bold text-foreground">{completionPercentage}%</span>
-          </div>
-
-          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
-            <div
-              className="h-full bg-primary transition-all duration-500 rounded-full"
-              style={{ width: `${completionPercentage}%` }}
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground pt-1">
-            {checks.map((check) => (
-              <span key={check.label} className="inline-flex items-center gap-1">
-                {check.completed ? (
-                  <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                ) : (
-                  <AlertCircle className="size-3 text-muted-foreground shrink-0" />
-                )}
-                <span className={check.completed ? "text-foreground font-medium" : ""}>
-                  {check.label}
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground pt-1">
+              {checks.map((check) => (
+                <span key={check.label} className="inline-flex items-center gap-1">
+                  {check.completed ? (
+                    <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  ) : (
+                    <AlertCircle className="size-3 text-muted-foreground shrink-0" />
+                  )}
+                  <span className={check.completed ? "text-foreground font-medium" : ""}>
+                    {check.label}
+                  </span>
                 </span>
-              </span>
-            ))}
+              ))}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Main Tabbed Editor */}
       <Tabs defaultValue="basic" className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full max-w-lg bg-muted/60 p-1">
-          <TabsTrigger value="basic" className="text-xs font-semibold gap-1.5">
+        <TabsList className="grid grid-cols-5 w-full max-w-2xl bg-muted/60 p-1 rounded-xl">
+          <TabsTrigger value="basic" className="text-xs font-semibold gap-1.5 rounded-lg">
             <UserIcon className="size-3.5" />
             <span>Basic Info</span>
           </TabsTrigger>
-          <TabsTrigger value="skills" className="text-xs font-semibold gap-1.5">
+          <TabsTrigger value="skills" className="text-xs font-semibold gap-1.5 rounded-lg">
             <Layers className="size-3.5" />
-            <span>Skills</span>
+            <span>Skills ({profile.skills.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="projects" className="text-xs font-semibold gap-1.5">
+          <TabsTrigger value="interests" className="text-xs font-semibold gap-1.5 rounded-lg">
+            <Sparkles className="size-3.5" />
+            <span>Interests ({profile.interests.length})</span>
+          </TabsTrigger>
+          <TabsTrigger value="projects" className="text-xs font-semibold gap-1.5 rounded-lg">
             <FolderGit2 className="size-3.5" />
-            <span>Portfolio</span>
+            <span>Portfolio ({profile.projects.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="achievements" className="text-xs font-semibold gap-1.5">
+          <TabsTrigger value="achievements" className="text-xs font-semibold gap-1.5 rounded-lg">
             <Trophy className="size-3.5" />
-            <span>Awards</span>
+            <span>Awards ({profile.achievements.length})</span>
           </TabsTrigger>
         </TabsList>
 
         {/* TAB 1: BASIC INFORMATION */}
         <TabsContent value="basic" className="space-y-6">
-          <Card className="border-border/80 shadow-sm rounded-xl">
+          <Card className="border-border/80 shadow-sm rounded-2xl">
             <CardHeader>
-              <CardTitle className="text-lg">Basic Information</CardTitle>
+              <CardTitle className="text-lg">Candidate Profile Information</CardTitle>
               <CardDescription className="text-xs">
-                Update your public candidate name, bio, and hackathon availability.
+                Update your primary role, academic program, branch, and introduction for hackathon teams.
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
+              {/* Row 1: Name & Avatar */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Name */}
                 <div className="space-y-1.5">
                   <label htmlFor="name" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Full Name *
@@ -558,10 +625,10 @@ export function ProfileEditorClient({
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Alex Morgan"
                     disabled={isPending}
+                    className="h-10 rounded-xl"
                   />
                 </div>
 
-                {/* Profile Photo URL */}
                 <div className="space-y-1.5">
                   <label htmlFor="photo" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Avatar Image URL
@@ -572,11 +639,29 @@ export function ProfileEditorClient({
                     onChange={(e) => setProfilePhoto(e.target.value)}
                     placeholder="https://example.com/avatar.jpg"
                     disabled={isPending}
+                    className="h-10 rounded-xl"
                   />
                 </div>
               </div>
 
-              {/* Bio */}
+              {/* Row 2: Primary Role */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Briefcase className="size-3.5 text-primary" />
+                  <span>Primary Role / Specialization *</span>
+                </label>
+                <RoleCombobox
+                  value={role}
+                  onChange={(val) => setRole(val)}
+                  disabled={isPending}
+                  placeholder="Select or type your primary role (e.g. Frontend Developer, AI / ML Engineer, UI/UX Designer)..."
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Select your primary discipline. This helps team leaders identify your core competency during matching.
+                </p>
+              </div>
+
+              {/* Row 3: Bio */}
               <div className="space-y-1.5">
                 <div className="flex justify-between items-center">
                   <label htmlFor="bio" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -589,24 +674,25 @@ export function ProfileEditorClient({
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   maxLength={300}
-                  placeholder="Full-stack developer passionate about building AI-powered developer tools..."
-                  className="min-h-[90px] resize-none"
+                  placeholder="Full-stack developer passionate about building AI-powered developer tools and hackathon projects..."
+                  className="min-h-[85px] resize-none rounded-xl"
                   disabled={isPending}
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                {/* Availability */}
+              {/* Row 4: Availability & Academic Year */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Availability Status
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <Clock className="size-3.5 text-emerald-500" />
+                    <span>Availability Status</span>
                   </label>
                   <Select
                     value={availability}
                     onValueChange={(val) => setAvailability(val as Availability)}
                     disabled={isPending}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-10 rounded-xl">
                       <SelectValue placeholder="Select availability" />
                     </SelectTrigger>
                     <SelectContent>
@@ -619,17 +705,17 @@ export function ProfileEditorClient({
                   </Select>
                 </div>
 
-                {/* Academic Year */}
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Academic Year
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                    <GraduationCap className="size-3.5 text-primary" />
+                    <span>Academic Year</span>
                   </label>
                   <Select
                     value={year}
                     onValueChange={(val) => setYear(val)}
                     disabled={isPending}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-10 rounded-xl">
                       <SelectValue placeholder="Select year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -641,78 +727,98 @@ export function ProfileEditorClient({
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* College Selector */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Institution / College
-                  </label>
-                  <Select
-                    value={collegeId}
-                    onValueChange={(val) => {
-                      setCollegeId(val)
-                      setDepartmentId("")
-                    }}
-                    disabled={isPending}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select college..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {colleges.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              {/* Department Selector */}
-              <div className="space-y-1.5 pt-1">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Department / Major
-                </label>
-                <Select
-                  value={departmentId}
-                  onValueChange={(val) => setDepartmentId(val)}
-                  disabled={isPending}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select department / branch..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {departments.length > 0
-                      ? departments.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))
-                      : AUTHORITATIVE_DEPARTMENTS.map((d) => (
-                          <SelectItem key={d.code} value={d.name}>
-                            {d.name} ({d.code})
+              {/* Row 5: Separate College, Program & Branch */}
+              <div className="space-y-4 pt-2 border-t border-border/60">
+                <div className="flex items-center gap-2">
+                  <Building className="size-4 text-primary" />
+                  <h3 className="text-sm font-bold text-foreground">Academic Institution &amp; Degree</h3>
+                </div>
+
+                {/* College / Institution Field */}
+                <div className="space-y-1.5">
+                  <label htmlFor="college" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    College / University Name
+                  </label>
+                  <Input
+                    id="college"
+                    value={collegeName}
+                    onChange={(e) => setCollegeName(e.target.value)}
+                    placeholder="e.g. Stanford University, MIT, Georgia Tech..."
+                    disabled={isPending}
+                    className="h-10 rounded-xl"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    Enter the name of your college or university.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Field A: Program / Degree */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Program / Degree *
+                    </label>
+                    <Select
+                      value={program}
+                      onValueChange={handleProgramChange}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger className="w-full h-10 rounded-xl">
+                        <SelectValue placeholder="Select degree program..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {AUTHORITATIVE_PROGRAMS.map((prog) => (
+                          <SelectItem key={prog.code} value={prog.name}>
+                            {prog.name}
                           </SelectItem>
                         ))}
-                  </SelectContent>
-                </Select>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Field B: Branch / Specialization (Conditionally Updated) */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Branch / Specialization *
+                    </label>
+                    <Select
+                      value={branch}
+                      onValueChange={(val) => setBranch(val)}
+                      disabled={isPending}
+                    >
+                      <SelectTrigger className="w-full h-10 rounded-xl">
+                        <SelectValue placeholder="Select specialization..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableBranches.map((b) => (
+                          <SelectItem key={b} value={b}>
+                            {b}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
               </div>
             </CardContent>
-            <CardFooter className="flex justify-end pt-2 border-t border-border/60">
+
+            <CardFooter className="flex justify-end pt-2 pb-6 border-t border-border/60 bg-muted/10 rounded-b-2xl">
               <Button
                 onClick={handleSaveBasicInfo}
                 disabled={isPending}
-                className="gap-2 font-semibold shadow-xs"
+                className="gap-2 font-semibold shadow-xs h-10 px-6 rounded-xl"
               >
                 {isPending ? (
                   <>
                     <Loader2 className="size-4 animate-spin" />
-                    <span>Saving...</span>
+                    <span>Saving Changes...</span>
                   </>
                 ) : (
                   <>
                     <Save className="size-4" />
-                    <span>Save Changes</span>
+                    <span>Save Profile</span>
                   </>
                 )}
               </Button>
@@ -720,84 +826,99 @@ export function ProfileEditorClient({
           </Card>
         </TabsContent>
 
-        {/* TAB 2: SKILLS & INTERESTS */}
+        {/* TAB 2: TECHNICAL SKILLS (MULTI-SELECT REDESIGN) */}
         <TabsContent value="skills" className="space-y-6">
-          {/* Verified Skills */}
-          <Card className="border-border/80 shadow-sm rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
-                <CardTitle className="text-lg">Technical &amp; Design Skills</CardTitle>
+                <CardTitle className="text-lg">Technical Skills &amp; Stack</CardTitle>
                 <CardDescription className="text-xs">
-                  Declare your skill competencies and experience level for deterministic match ranking.
+                  Add multiple languages, frameworks, databases, and tools to highlight your competencies.
                 </CardDescription>
               </div>
-
-              {/* Add Skill Dialog */}
               <Dialog open={isAddSkillOpen} onOpenChange={setIsAddSkillOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="gap-1.5 text-xs shadow-xs">
-                    <Plus className="size-3.5" />
-                    <span>Add Skill</span>
+                  <Button size="sm" className="gap-1.5 font-semibold shadow-xs rounded-xl">
+                    <Plus className="size-4" />
+                    <span>Add Technical Skills</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md sm:max-w-lg">
+                <DialogContent className="sm:max-w-2xl rounded-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Add Technical Skill</DialogTitle>
+                    <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                      <Sparkles className="size-5 text-primary" />
+                      <span>Select Technical Skills</span>
+                    </DialogTitle>
                     <DialogDescription className="text-xs">
-                      Search and select from 80+ standardized engineering and design skills, or add a custom skill.
+                      Select one or multiple skills from our authoritative catalog. Click skills to toggle them on or off.
                     </DialogDescription>
                   </DialogHeader>
+
                   <div className="space-y-4 py-2">
+                    {/* Proficiency Level Picker for Selected Batch */}
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Select Skill *
+                        Proficiency Level for Selected Skills
                       </label>
-                      <SearchableSkillSelector
-                        availableSkills={availableSkills}
-                        selectedSkillIds={selectedSkillId ? [selectedSkillId] : []}
-                        onSelectSkill={(skill) => setSelectedSkillId(skill.id.startsWith('auth-') ? skill.name : skill.id)}
-                        onAddCustomSkill={(customName) => setSelectedSkillId(customName)}
-                        maxSelected={1}
-                        placeholder="Search skills (e.g. React, Python, Docker, Figma)..."
-                      />
-                      {selectedSkillId && (
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground pt-1">
-                          <span className="font-semibold text-foreground">Selected:</span>
-                          <Badge variant="exact" className="text-xs font-bold">{selectedSkillId}</Badge>
-                        </div>
-                      )}
+                      <div className="grid grid-cols-3 gap-2">
+                        {SKILL_LEVEL_OPTIONS.map((lvl) => (
+                          <button
+                            key={lvl.value}
+                            type="button"
+                            onClick={() => setSelectedSkillLevel(lvl.value)}
+                            className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                              selectedSkillLevel === lvl.value
+                                ? "border-primary bg-primary/10 font-bold ring-1 ring-primary shadow-xs"
+                                : "border-border/70 hover:bg-muted/50 text-muted-foreground"
+                            }`}
+                          >
+                            <div className="text-xs text-foreground font-semibold">{lvl.label}</div>
+                            <div className="text-[10px] text-muted-foreground mt-0.5 truncate">{lvl.description}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="space-y-1.5 pt-2 border-t border-border/60">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Proficiency Level *
-                      </label>
-                      <Select
-                        value={selectedSkillLevel}
-                        onValueChange={(val) => setSelectedSkillLevel(val as SkillLevel)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SKILL_LEVEL_OPTIONS.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>
-                              <div className="flex flex-col text-left py-0.5">
-                                <span className="font-semibold text-foreground">{opt.label}</span>
-                                <span className="text-[11px] text-muted-foreground">{opt.description}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {/* Redesigned Multi-Select Searchable Skill Selector */}
+                    <SearchableSkillSelector
+                      isMultiSelect
+                      selectedSkills={selectedSkillNames}
+                      onSelectedSkillsChange={setSelectedSkillNames}
+                      excludeSkills={profile.skills.map((s) => s.skill.name)}
+                      availableSkills={availableSkills}
+                      placeholder="Search 80+ skills (e.g. React, Next.js, Python, PostgreSQL, Docker)..."
+                    />
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddSkillOpen(false)}>
+
+                  <DialogFooter className="pt-2 border-t border-border/60 flex items-center justify-between">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setIsAddSkillOpen(false)
+                        setSelectedSkillNames([])
+                      }}
+                      className="text-xs"
+                    >
                       Cancel
                     </Button>
-                    <Button onClick={handleAddSkill} disabled={isPending || !selectedSkillId}>
-                      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Add Skill"}
+                    <Button
+                      type="button"
+                      onClick={handleAddSkillsBatch}
+                      disabled={isPending || selectedSkillNames.length === 0}
+                      className="gap-2 font-semibold shadow-xs"
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" />
+                          <span>Adding Skills...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="size-4" />
+                          <span>Add {selectedSkillNames.length} Selected Skill{selectedSkillNames.length === 1 ? "" : "s"}</span>
+                        </>
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -806,127 +927,131 @@ export function ProfileEditorClient({
 
             <CardContent>
               {profile.skills.length === 0 ? (
-                <div className="text-center py-8 border border-dashed border-border rounded-xl space-y-2">
-                  <Layers className="size-8 mx-auto text-muted-foreground/60" />
-                  <p className="text-sm font-semibold text-foreground">No Skills Added Yet</p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Add your technical skills to appear in Exact Match recommendations for team roles.
-                  </p>
+                <div className="text-center py-12 border-2 border-dashed border-border/70 rounded-2xl space-y-3 bg-muted/20">
+                  <Layers className="size-10 text-muted-foreground mx-auto opacity-50" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">No technical skills added yet</p>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      Add your skills to allow team leaders to discover you via deterministic skill-matching.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddSkillOpen(true)}
+                    className="gap-1.5 font-semibold"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Add Technical Skills</span>
+                  </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {profile.skills.map(({ skill, level }) => (
-                    <div
-                      key={skill.id}
-                      className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-muted/20 hover:border-border transition-colors"
-                    >
-                      <div className="space-y-1">
-                        <div className="font-semibold text-sm text-foreground">{skill.name}</div>
-                        <Badge
-                          variant={
-                            level === "ADVANCED"
-                              ? "exact"
-                              : level === "INTERMEDIATE"
-                              ? "secondary"
-                              : "outline"
-                          }
-                          className="text-[10px] px-1.5 py-0"
-                        >
-                          {level}
-                        </Badge>
-                      </div>
-
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleRemoveSkill(skill.id)}
-                        disabled={isPending}
-                        className="size-8 text-muted-foreground hover:text-destructive"
-                        aria-label={`Remove ${skill.name}`}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {profile.skills.map(({ skill, level }) => {
+                    const levelMeta = SKILL_LEVEL_OPTIONS.find((l) => l.value === level)
+                    return (
+                      <div
+                        key={skill.id}
+                        className="flex items-center justify-between p-3 rounded-xl border border-border/80 bg-card hover:border-primary/40 hover:shadow-2xs transition-all"
                       >
-                        <Trash2 className="size-3.5" />
-                      </Button>
-                    </div>
-                  ))}
+                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                          <div className="size-8 rounded-lg bg-background border border-border flex items-center justify-center shrink-0 shadow-2xs">
+                            <TechIcon name={skill.name} className="size-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="text-xs font-bold text-foreground truncate block">
+                              {skill.name}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={`text-[9px] uppercase tracking-wider font-semibold py-0 px-1.5 mt-0.5 ${levelMeta?.color || ""}`}
+                            >
+                              {level}
+                            </Badge>
+                          </div>
+                        </div>
+
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveSkill(skill.id)}
+                          disabled={isPending}
+                          className="size-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg shrink-0"
+                          aria-label={`Remove ${skill.name}`}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </CardContent>
           </Card>
+        </TabsContent>
 
-          {/* Interests Section */}
-          <Card className="border-border/80 shadow-sm rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between">
+        {/* TAB 3: DOMAIN INTERESTS */}
+        <TabsContent value="interests" className="space-y-6">
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
                 <CardTitle className="text-lg">Domain Interests</CardTitle>
                 <CardDescription className="text-xs">
-                  Declare domains or stacks you want to learn (qualifies for Interest-Only matching).
+                  Highlight hackathon categories and industries you are passionate about exploring.
                 </CardDescription>
               </div>
-
-              {/* Add Interest Dialog */}
               <Dialog open={isAddInterestOpen} onOpenChange={setIsAddInterestOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1.5 text-xs shadow-xs">
-                    <Plus className="size-3.5" />
+                  <Button size="sm" className="gap-1.5 font-semibold shadow-xs rounded-xl">
+                    <Plus className="size-4" />
                     <span>Add Interest</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md sm:max-w-lg">
+                <DialogContent className="sm:max-w-md rounded-2xl">
                   <DialogHeader>
-                    <DialogTitle>Add Domain Interest</DialogTitle>
+                    <DialogTitle className="text-xl font-bold">Add Domain Interest</DialogTitle>
                     <DialogDescription className="text-xs">
-                      Select project and hackathon domains you want to explore.
+                      Choose from our standard list of hackathon domains or type a custom domain.
                     </DialogDescription>
                   </DialogHeader>
+
                   <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Select Standard Domain
+                        Select Standard Interest
                       </label>
-                      <div className="grid grid-cols-2 gap-1.5 max-h-56 overflow-y-auto p-2 border border-border/80 rounded-xl bg-muted/20">
-                        {AUTHORITATIVE_INTERESTS.filter(
-                          (interest) => !profile.interests.some((ui) => ui.skill.name.toLowerCase() === interest.toLowerCase())
-                        ).map((interest) => (
-                          <button
-                            key={interest}
-                            type="button"
-                            onClick={() => setSelectedInterestSkillId(interest)}
-                            className={`flex items-center justify-between p-2 rounded-lg border text-left text-xs transition-all cursor-pointer ${
-                              selectedInterestSkillId === interest
-                                ? "bg-primary/15 border-primary text-foreground font-bold shadow-2xs"
-                                : "bg-card border-border/60 hover:bg-muted text-muted-foreground hover:text-foreground"
-                            }`}
-                          >
-                            <span className="truncate">{interest}</span>
-                            {selectedInterestSkillId === interest && (
-                              <CheckCircle2 className="size-3.5 text-primary shrink-0" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5 pt-2 border-t border-border/60">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Or Type Custom Domain
-                      </label>
-                      <Input
+                      <Select
                         value={selectedInterestSkillId}
-                        onChange={(e) => setSelectedInterestSkillId(e.target.value)}
-                        placeholder="e.g. Quantum Computing, BioTech, Agritech..."
-                        className="text-xs h-9"
-                      />
+                        onValueChange={setSelectedInterestSkillId}
+                      >
+                        <SelectTrigger className="w-full h-10 rounded-xl">
+                          <SelectValue placeholder="Choose a domain..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {AUTHORITATIVE_INTERESTS.map((interest) => (
+                            <SelectItem key={interest} value={interest}>
+                              {interest}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddInterestOpen(false)}>
-                      Cancel
-                    </Button>
+
+                  <DialogFooter className="pt-2 border-t border-border/60">
                     <Button
+                      type="button"
                       onClick={handleAddInterest}
                       disabled={isPending || !selectedInterestSkillId}
+                      className="w-full font-semibold shadow-xs"
                     >
-                      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Add Interest"}
+                      {isPending ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin mr-2" />
+                          <span>Adding...</span>
+                        </>
+                      ) : (
+                        <span>Add Interest</span>
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -935,25 +1060,40 @@ export function ProfileEditorClient({
 
             <CardContent>
               {profile.interests.length === 0 ? (
-                <div className="text-center py-6 border border-dashed border-border rounded-xl space-y-1">
-                  <p className="text-xs text-muted-foreground">No declared interests yet.</p>
+                <div className="text-center py-12 border-2 border-dashed border-border/70 rounded-2xl space-y-3 bg-muted/20">
+                  <Sparkles className="size-10 text-purple-500 mx-auto opacity-50" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">No domain interests added yet</p>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      Add domains like AI, Web3, FinTech, or HealthTech to discover relevant hackathon teams.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddInterestOpen(true)}
+                    className="gap-1.5 font-semibold"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Add First Interest</span>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {profile.interests.map(({ skill }) => (
                     <Badge
                       key={skill.id}
-                      variant="interest"
-                      className="gap-1.5 pl-2.5 pr-1.5 py-1 text-xs"
+                      variant="outline"
+                      className="gap-2 pl-3 pr-1.5 py-1.5 text-xs font-medium bg-muted/40 border-border/80 rounded-xl"
                     >
                       <span>{skill.name}</span>
                       <button
                         type="button"
                         onClick={() => handleRemoveInterest(skill.id)}
-                        className="hover:text-destructive transition-colors ml-1"
-                        aria-label={`Remove ${skill.name} interest`}
+                        disabled={isPending}
+                        className="rounded-full p-0.5 hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
+                        aria-label={`Remove ${skill.name}`}
                       >
-                        ×
+                        <Trash2 className="size-3" />
                       </button>
                     </Badge>
                   ))}
@@ -963,33 +1103,32 @@ export function ProfileEditorClient({
           </Card>
         </TabsContent>
 
-        {/* TAB 3: PROJECTS / PORTFOLIO */}
+        {/* TAB 4: PORTFOLIO & PROJECTS */}
         <TabsContent value="projects" className="space-y-6">
-          <Card className="border-border/80 shadow-sm rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
                 <CardTitle className="text-lg">Project Portfolio</CardTitle>
                 <CardDescription className="text-xs">
-                  Showcase verifiable projects, GitHub repositories, and role contributions.
+                  Showcase projects you have built to boost your matching experience rank.
                 </CardDescription>
               </div>
-
-              {/* Add Project Dialog */}
               <Dialog open={isAddProjectOpen} onOpenChange={setIsAddProjectOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="gap-1.5 text-xs shadow-xs">
-                    <Plus className="size-3.5" />
+                  <Button size="sm" className="gap-1.5 font-semibold shadow-xs rounded-xl">
+                    <Plus className="size-4" />
                     <span>Add Project</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-lg">
+                <DialogContent className="sm:max-w-md rounded-2xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
-                    <DialogTitle>Add Project to Portfolio</DialogTitle>
+                    <DialogTitle className="text-xl font-bold">Add Portfolio Project</DialogTitle>
                     <DialogDescription className="text-xs">
-                      Provide project metadata and links to demonstrate hands-on experience.
+                      Enter details of a completed or ongoing hackathon project.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-3.5 py-2 max-h-[60vh] overflow-y-auto pr-1">
+
+                  <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                         Project Title *
@@ -997,126 +1136,88 @@ export function ProfileEditorClient({
                       <Input
                         value={projectTitle}
                         onChange={(e) => setProjectTitle(e.target.value)}
-                        placeholder="Autonomous Navigation Drone"
-                        required
+                        placeholder="AI Code Assistant"
+                        className="h-10 rounded-xl"
                       />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Your Role *
-                        </label>
-                        <Input
-                          value={projectRole}
-                          onChange={(e) => setProjectRole(e.target.value)}
-                          placeholder="Lead Frontend Engineer"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                          Date / Year
-                        </label>
-                        <Input
-                          type="date"
-                          value={projectDate}
-                          onChange={(e) => setProjectDate(e.target.value)}
-                        />
-                      </div>
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Description *
+                        Your Role in Project *
+                      </label>
+                      <Input
+                        value={projectRole}
+                        onChange={(e) => setProjectRole(e.target.value)}
+                        placeholder="Lead Frontend Engineer"
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Completion Date *
+                      </label>
+                      <Input
+                        type="date"
+                        value={projectDate}
+                        onChange={(e) => setProjectDate(e.target.value)}
+                        className="h-10 rounded-xl"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Project Description *
                       </label>
                       <Textarea
                         value={projectDescription}
                         onChange={(e) => setProjectDescription(e.target.value)}
-                        placeholder="Brief summary of the problem solved, tech stack used, and key milestones..."
-                        className="min-h-[80px]"
-                        required
+                        placeholder="Describe the problem solved, tech stack used, and key features..."
+                        className="min-h-[80px] rounded-xl"
                       />
                     </div>
 
-                    {/* External Links */}
-                    <div className="space-y-2 pt-1">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Repository &amp; Demo Links
-                      </label>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Code2 className="size-4 text-muted-foreground shrink-0" />
-                          <Input
-                            value={projectGithub}
-                            onChange={(e) => setProjectGithub(e.target.value)}
-                            placeholder="https://github.com/user/project"
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <PenTool className="size-4 text-muted-foreground shrink-0" />
-                          <Input
-                            value={projectFigma}
-                            onChange={(e) => setProjectFigma(e.target.value)}
-                            placeholder="https://figma.com/file/..."
-                            className="h-8 text-xs"
-                          />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Globe className="size-4 text-muted-foreground shrink-0" />
-                          <Input
-                            value={projectDemo}
-                            onChange={(e) => setProjectDemo(e.target.value)}
-                            placeholder="https://my-app.vercel.app"
-                            className="h-8 text-xs"
-                          />
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          GitHub Repo URL
+                        </label>
+                        <Input
+                          value={projectGithub}
+                          onChange={(e) => setProjectGithub(e.target.value)}
+                          placeholder="https://github.com/..."
+                          className="h-9 rounded-xl text-xs"
+                        />
                       </div>
-                    </div>
-
-                    {/* Skill Tags */}
-                    <div className="space-y-1.5 pt-1">
-                      <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Associated Tech Stack &amp; Skills ({projectSelectedSkillIds.length} tagged)
-                      </label>
-                      <SearchableSkillSelector
-                        availableSkills={availableSkills}
-                        selectedSkillIds={projectSelectedSkillIds}
-                        onSelectSkill={(skill) => {
-                          const id = skill.id.startsWith('auth-') ? skill.name : skill.id
-                          if (!projectSelectedSkillIds.includes(id)) {
-                            setProjectSelectedSkillIds([...projectSelectedSkillIds, id])
-                          }
-                        }}
-                        onRemoveSkill={(id) => {
-                          setProjectSelectedSkillIds(projectSelectedSkillIds.filter((sid) => sid !== id))
-                        }}
-                        placeholder="Tag project tech stack (e.g. React, Node.js, Tailwind, Docker)..."
-                      />
-                    </div>
-
-                    {/* Privacy Checkbox */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <input
-                        type="checkbox"
-                        id="isPrivate"
-                        checked={projectIsPrivate}
-                        onChange={(e) => setProjectIsPrivate(e.target.checked)}
-                        className="rounded border-border"
-                      />
-                      <label htmlFor="isPrivate" className="text-xs text-muted-foreground cursor-pointer">
-                        Mark as Private (only visible to team recruiters after invitation)
-                      </label>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                          Live Demo URL
+                        </label>
+                        <Input
+                          value={projectDemo}
+                          onChange={(e) => setProjectDemo(e.target.value)}
+                          placeholder="https://demo.app"
+                          className="h-9 rounded-xl text-xs"
+                        />
+                      </div>
                     </div>
                   </div>
 
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddProjectOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreateProject} disabled={isPending}>
-                      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Save Project"}
+                  <DialogFooter className="pt-2 border-t border-border/60">
+                    <Button
+                      type="button"
+                      onClick={handleCreateProject}
+                      disabled={isPending}
+                      className="w-full font-semibold shadow-xs"
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin mr-2" />
+                          <span>Saving Project...</span>
+                        </>
+                      ) : (
+                        <span>Save Project</span>
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -1125,104 +1226,73 @@ export function ProfileEditorClient({
 
             <CardContent>
               {profile.projects.length === 0 ? (
-                <div className="text-center py-10 border border-dashed border-border rounded-xl space-y-2">
-                  <FolderGit2 className="size-8 mx-auto text-muted-foreground/60" />
-                  <p className="text-sm font-semibold text-foreground">No Projects Added Yet</p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Adding projects helps recruiters evaluate your real-world development experience.
-                  </p>
+                <div className="text-center py-12 border-2 border-dashed border-border/70 rounded-2xl space-y-3 bg-muted/20">
+                  <FolderGit2 className="size-10 text-muted-foreground mx-auto opacity-50" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">No projects added yet</p>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      Add projects to showcase your practical experience to potential team leaders.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddProjectOpen(true)}
+                    className="gap-1.5 font-semibold"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Add First Project</span>
+                  </Button>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {profile.projects.map((project) => (
-                    <Card
-                      key={project.id}
-                      className="border-border/80 bg-muted/10 hover:border-border transition-colors rounded-xl flex flex-col justify-between"
+                  {profile.projects.map((proj) => (
+                    <div
+                      key={proj.id}
+                      className="p-4 rounded-xl border border-border/80 bg-card space-y-3 shadow-2xs"
                     >
-                      <CardHeader className="pb-2 space-y-1.5">
-                        <div className="flex items-start justify-between gap-2">
-                          <CardTitle className="text-base font-bold text-foreground leading-snug">
-                            {project.title}
-                          </CardTitle>
-                          {project.isPrivate ? (
-                            <Badge variant="outline" className="text-[10px] gap-1 text-muted-foreground">
-                              <Lock className="size-3" /> Private
-                            </Badge>
-                          ) : (
-                            <Badge variant="success" className="text-[10px]">
-                              Public
-                            </Badge>
-                          )}
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <h4 className="font-bold text-sm text-foreground leading-tight">{proj.title}</h4>
+                          <span className="text-xs text-primary font-medium">{proj.role}</span>
                         </div>
-                        <div className="text-xs font-semibold text-primary">{project.role}</div>
-                        <CardDescription className="text-xs line-clamp-3 leading-relaxed">
-                          {project.description}
-                        </CardDescription>
-                      </CardHeader>
-
-                      <CardContent className="pb-3 space-y-3">
-                        {/* Skills */}
-                        {project.skills.length > 0 && (
-                          <div className="flex flex-wrap gap-1">
-                            {project.skills.map(({ skill }) => (
-                              <Badge key={skill.id} variant="secondary" className="text-[10px] px-1.5 py-0">
-                                {skill.name}
-                              </Badge>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Links */}
-                        <div className="flex items-center gap-3 text-xs pt-1 border-t border-border/40">
-                          {project.githubLink && (
-                            <a
-                              href={project.githubLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Code2 className="size-3.5" />
-                              <span>GitHub</span>
-                            </a>
-                          )}
-                          {project.figmaLink && (
-                            <a
-                              href={project.figmaLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <PenTool className="size-3.5" />
-                              <span>Figma</span>
-                            </a>
-                          )}
-                          {project.demoLink && (
-                            <a
-                              href={project.demoLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              <Globe className="size-3.5" />
-                              <span>Demo</span>
-                            </a>
-                          )}
-                        </div>
-                      </CardContent>
-
-                      <CardFooter className="pt-2 border-t border-border/40 flex justify-end">
                         <Button
                           variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteProject(project.id)}
+                          size="icon"
+                          onClick={() => handleDeleteProject(proj.id)}
                           disabled={isPending}
-                          className="h-8 px-2 text-xs text-muted-foreground hover:text-destructive"
+                          className="size-7 text-muted-foreground hover:text-destructive"
                         >
-                          <Trash2 className="size-3.5 mr-1" />
-                          <span>Delete</span>
+                          <Trash2 className="size-3.5" />
                         </Button>
-                      </CardFooter>
-                    </Card>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {proj.description}
+                      </p>
+                      <div className="flex items-center gap-3 pt-1 text-xs">
+                        {proj.githubLink && (
+                          <a
+                            href={proj.githubLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
+                          >
+                            <Code2 className="size-3.5" />
+                            <span>Code</span>
+                          </a>
+                        )}
+                        {proj.demoLink && (
+                          <a
+                            href={proj.demoLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:underline inline-flex items-center gap-1 font-semibold"
+                          >
+                            <Globe className="size-3.5" />
+                            <span>Live Demo</span>
+                          </a>
+                        )}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
@@ -1230,53 +1300,53 @@ export function ProfileEditorClient({
           </Card>
         </TabsContent>
 
-        {/* TAB 4: ACHIEVEMENTS & AWARDS */}
+        {/* TAB 5: AWARDS & ACHIEVEMENTS */}
         <TabsContent value="achievements" className="space-y-6">
-          <Card className="border-border/80 shadow-sm rounded-xl">
-            <CardHeader className="flex flex-row items-center justify-between">
+          <Card className="border-border/80 shadow-sm rounded-2xl">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <div>
-                <CardTitle className="text-lg">Achievements &amp; Hackathon Awards</CardTitle>
+                <CardTitle className="text-lg">Awards &amp; Hackathon Honors</CardTitle>
                 <CardDescription className="text-xs">
-                  Highlight competition placements, certifications, and academic recognitions.
+                  Highlight podium finishes, certifications, and collegiate awards.
                 </CardDescription>
               </div>
-
-              {/* Add Achievement Dialog */}
               <Dialog open={isAddAchievementOpen} onOpenChange={setIsAddAchievementOpen}>
                 <DialogTrigger asChild>
-                  <Button size="sm" className="gap-1.5 text-xs shadow-xs">
-                    <Plus className="size-3.5" />
+                  <Button size="sm" className="gap-1.5 font-semibold shadow-xs rounded-xl">
+                    <Plus className="size-4" />
                     <span>Add Award</span>
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="sm:max-w-md rounded-2xl">
                   <DialogHeader>
-                    <DialogTitle>Add Achievement</DialogTitle>
+                    <DialogTitle className="text-xl font-bold">Record Achievement</DialogTitle>
                     <DialogDescription className="text-xs">
-                      Document your competition placement or recognition.
+                      Enter details of an award or hackathon win.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-3.5 py-2">
+
+                  <div className="space-y-4 py-2">
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Title / Award Name *
+                        Achievement Title *
                       </label>
                       <Input
                         value={achievementTitle}
                         onChange={(e) => setAchievementTitle(e.target.value)}
-                        placeholder="1st Place - Smart City Hackathon 2026"
-                        required
+                        placeholder="1st Place - Smart India Hackathon"
+                        className="h-10 rounded-xl"
                       />
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Date
+                        Date Awarded *
                       </label>
                       <Input
                         type="date"
                         value={achievementDate}
                         onChange={(e) => setAchievementDate(e.target.value)}
+                        className="h-10 rounded-xl"
                       />
                     </div>
 
@@ -1287,30 +1357,39 @@ export function ProfileEditorClient({
                       <Textarea
                         value={achievementDescription}
                         onChange={(e) => setAchievementDescription(e.target.value)}
-                        placeholder="Built an autonomous waste management pipeline with IoT sensors..."
-                        className="min-h-[80px]"
-                        required
+                        placeholder="Built a real-time IoT monitoring system evaluated by judges..."
+                        className="min-h-[80px] rounded-xl"
                       />
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Certificate / Evidence Link
+                        Certificate / Proof Link
                       </label>
                       <Input
                         value={achievementLink}
                         onChange={(e) => setAchievementLink(e.target.value)}
                         placeholder="https://credential.net/..."
+                        className="h-10 rounded-xl"
                       />
                     </div>
                   </div>
 
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsAddAchievementOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button onClick={handleCreateAchievement} disabled={isPending}>
-                      {isPending ? <Loader2 className="size-4 animate-spin" /> : "Save Award"}
+                  <DialogFooter className="pt-2 border-t border-border/60">
+                    <Button
+                      type="button"
+                      onClick={handleCreateAchievement}
+                      disabled={isPending}
+                      className="w-full font-semibold shadow-xs"
+                    >
+                      {isPending ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin mr-2" />
+                          <span>Saving Award...</span>
+                        </>
+                      ) : (
+                        <span>Save Achievement</span>
+                      )}
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -1319,50 +1398,58 @@ export function ProfileEditorClient({
 
             <CardContent>
               {profile.achievements.length === 0 ? (
-                <div className="text-center py-8 border border-dashed border-border rounded-xl space-y-2">
-                  <Trophy className="size-8 mx-auto text-muted-foreground/60" />
-                  <p className="text-sm font-semibold text-foreground">No Achievements Added Yet</p>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Showcase hackathon victories, academic honors, or published projects.
-                  </p>
+                <div className="text-center py-12 border-2 border-dashed border-border/70 rounded-2xl space-y-3 bg-muted/20">
+                  <Trophy className="size-10 text-muted-foreground mx-auto opacity-50" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">No awards added yet</p>
+                    <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                      Add your competitive wins and certifications to stand out to team organizers.
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsAddAchievementOpen(true)}
+                    className="gap-1.5 font-semibold"
+                  >
+                    <Plus className="size-3.5" />
+                    <span>Add First Award</span>
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {profile.achievements.map((achievement) => (
+                  {profile.achievements.map((ach) => (
                     <div
-                      key={achievement.id}
-                      className="flex items-start justify-between p-4 rounded-xl border border-border/80 bg-muted/20 hover:border-border transition-colors"
+                      key={ach.id}
+                      className="flex items-start justify-between p-4 rounded-xl border border-border/80 bg-card space-y-1 shadow-2xs"
                     >
                       <div className="space-y-1">
                         <div className="flex items-center gap-2">
                           <Trophy className="size-4 text-amber-500 shrink-0" />
-                          <span className="font-bold text-sm text-foreground">{achievement.title}</span>
+                          <h4 className="font-bold text-sm text-foreground">{ach.title}</h4>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed pl-6">
-                          {achievement.description}
+                          {ach.description}
                         </p>
-                        {achievement.link && (
+                        {ach.link && (
                           <div className="pl-6 pt-1">
                             <a
-                              href={achievement.link}
+                              href={ach.link}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                              className="text-xs text-primary hover:underline inline-flex items-center gap-1 font-semibold"
                             >
-                              <span>View Certificate</span>
                               <ExternalLink className="size-3" />
+                              <span>View Certificate</span>
                             </a>
                           </div>
                         )}
                       </div>
-
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => handleDeleteAchievement(achievement.id)}
+                        onClick={() => handleDeleteAchievement(ach.id)}
                         disabled={isPending}
-                        className="size-8 text-muted-foreground hover:text-destructive shrink-0"
-                        aria-label={`Delete ${achievement.title}`}
+                        className="size-7 text-muted-foreground hover:text-destructive shrink-0"
                       >
                         <Trash2 className="size-3.5" />
                       </Button>

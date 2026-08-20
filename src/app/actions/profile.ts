@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
 import { prisma } from '@/lib/prisma'
 import { Availability, SkillLevel } from '@prisma/client'
-import { AUTHORITATIVE_SKILLS } from '@/lib/constants/options'
+import { AUTHORITATIVE_SKILLS, formatProfileBio } from '@/lib/constants/options'
 
 async function getAuthenticatedUser() {
   const supabase = await createClient()
@@ -205,6 +205,83 @@ export async function getPublicProfile(userId: string) {
   }
 }
 
+export async function ensureDepartmentAndCollege(data: {
+  collegeName?: string | null
+  programName?: string | null
+  branchName?: string | null
+}): Promise<{ collegeId: string | null; departmentId: string | null }> {
+  let collegeId: string | null = null
+  let departmentId: string | null = null
+
+  try {
+    // 1. Resolve or create College if entered
+    if (data.collegeName && data.collegeName.trim()) {
+      const collegeTrimmed = data.collegeName.trim()
+      const existingCollege = await prisma.college.findFirst({
+        where: { name: { equals: collegeTrimmed, mode: 'insensitive' } },
+      })
+      if (existingCollege) {
+        collegeId = existingCollege.id
+      } else {
+        const domain = collegeTrimmed.toLowerCase().replace(/[^a-z0-9]/g, '') + '.edu'
+        const newCollege = await prisma.college.create({
+          data: {
+            name: collegeTrimmed,
+            domain: domain.slice(0, 50) || 'college.edu',
+          },
+        })
+        collegeId = newCollege.id
+      }
+    }
+
+    // 2. Resolve or create Department
+    const program = data.programName?.trim()
+    const branch = data.branchName?.trim()
+    if (program || branch) {
+      const deptName = program && branch ? `${program} - ${branch}` : (branch || program || 'General')
+
+      // Ensure a collegeId exists for department foreign key constraint
+      if (!collegeId) {
+        const defaultCollege = await prisma.college.findFirst()
+        if (defaultCollege) {
+          collegeId = defaultCollege.id
+        } else {
+          const newDef = await prisma.college.create({
+            data: {
+              name: 'General University',
+              domain: 'general.edu',
+            },
+          })
+          collegeId = newDef.id
+        }
+      }
+
+      const existingDept = await prisma.department.findFirst({
+        where: {
+          collegeId: collegeId,
+          name: { equals: deptName, mode: 'insensitive' },
+        },
+      })
+
+      if (existingDept) {
+        departmentId = existingDept.id
+      } else {
+        const createdDept = await prisma.department.create({
+          data: {
+            name: deptName,
+            collegeId: collegeId,
+          },
+        })
+        departmentId = createdDept.id
+      }
+    }
+  } catch (err) {
+    console.error('Error ensuring department/college:', err)
+  }
+
+  return { collegeId, departmentId }
+}
+
 export async function updateBasicProfile(data: {
   name: string
   bio?: string | null
@@ -212,6 +289,10 @@ export async function updateBasicProfile(data: {
   year?: number | null
   departmentId?: string | null
   collegeId?: string | null
+  collegeName?: string | null
+  programName?: string | null
+  branchName?: string | null
+  role?: string | null
   profilePhoto?: string | null
 }) {
   const authUser = await getAuthenticatedUser()
@@ -221,15 +302,30 @@ export async function updateBasicProfile(data: {
   }
 
   try {
+    let finalCollegeId = data.collegeId || null
+    let finalDeptId = data.departmentId || null
+
+    if (data.programName || data.branchName || data.collegeName) {
+      const ensured = await ensureDepartmentAndCollege({
+        collegeName: data.collegeName,
+        programName: data.programName,
+        branchName: data.branchName,
+      })
+      if (ensured.collegeId) finalCollegeId = ensured.collegeId
+      if (ensured.departmentId) finalDeptId = ensured.departmentId
+    }
+
+    const formattedBio = formatProfileBio(data.role, data.bio)
+
     const updated = await prisma.user.update({
       where: { id: authUser.id },
       data: {
         name: data.name.trim(),
-        bio: data.bio?.trim() || null,
+        bio: formattedBio || null,
         availability: data.availability,
         year: data.year ?? null,
-        departmentId: data.departmentId || null,
-        collegeId: data.collegeId || null,
+        departmentId: finalDeptId,
+        collegeId: finalCollegeId,
         profilePhoto: data.profilePhoto?.trim() || null,
       },
     })
@@ -312,6 +408,59 @@ export async function getAllCollegesAndDepartments() {
     orderBy: { name: 'asc' },
   })
   return colleges
+}
+
+export async function addUserSkillsBatch(
+  skills: Array<{ skillIdOrName: string; level?: SkillLevel }>
+) {
+  const authUser = await getAuthenticatedUser()
+
+  if (!skills || skills.length === 0) {
+    return { error: 'No skills provided' }
+  }
+
+  try {
+    let addedCount = 0
+    for (const item of skills) {
+      const skillIdOrName = item.skillIdOrName
+      const level = item.level || 'INTERMEDIATE'
+
+      let resolvedSkillId = skillIdOrName
+      if (skillIdOrName.startsWith('auth-') || skillIdOrName.startsWith('custom-')) {
+        const rawName = skillIdOrName.replace(/^(auth|custom)-/, '')
+        const ensured = await ensureSkillByName(rawName)
+        if (ensured) resolvedSkillId = ensured.id
+      } else {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(skillIdOrName)
+        if (!isUuid) {
+          const ensured = await ensureSkillByName(skillIdOrName)
+          if (ensured) resolvedSkillId = ensured.id
+        }
+      }
+
+      await prisma.userSkill.upsert({
+        where: {
+          userId_skillId: {
+            userId: authUser.id,
+            skillId: resolvedSkillId,
+          },
+        },
+        update: { level },
+        create: {
+          userId: authUser.id,
+          skillId: resolvedSkillId,
+          level,
+        },
+      })
+      addedCount++
+    }
+
+    revalidatePath('/profile')
+    revalidatePath(`/users/${authUser.id}`)
+    return { success: true, addedCount }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Failed to add skills in batch' }
+  }
 }
 
 export async function addUserSkill(skillIdOrName: string, level: SkillLevel) {

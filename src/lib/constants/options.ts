@@ -1,6 +1,6 @@
 /**
  * AUTHORITATIVE PLATFORM OPTIONS & CONTROLLED TAXONOMIES
- * Single source of truth for skills, roles, departments, academic years, availability, and domains.
+ * Single source of truth for skills, roles, academic programs, branches, academic years, availability, and domains.
  */
 
 import type { SkillLevel, PreferredExperience, Availability } from "@prisma/client"
@@ -98,178 +98,424 @@ export const AUTHORITATIVE_SKILLS: SkillDefinition[] = [
   // --- CLOUD & DEVOPS ---
   { name: "AWS", category: "Cloud & DevOps", aliases: ["Amazon Web Services"] },
   { name: "Microsoft Azure", category: "Cloud & DevOps", aliases: ["Azure"] },
-  { name: "Google Cloud", category: "Cloud & DevOps", aliases: ["GCP"] },
+  { name: "Google Cloud Platform", category: "Cloud & DevOps", aliases: ["GCP"] },
   { name: "Docker", category: "Cloud & DevOps" },
   { name: "Kubernetes", category: "Cloud & DevOps", aliases: ["K8s"] },
-  { name: "Terraform", category: "Cloud & DevOps" },
-  { name: "CI/CD", category: "Cloud & DevOps", aliases: ["Continuous Integration"] },
-  { name: "GitHub Actions", category: "Cloud & DevOps" },
-  { name: "Linux", category: "Cloud & DevOps", aliases: ["Ubuntu", "Bash"] },
+  { name: "CI/CD", category: "Cloud & DevOps", aliases: ["GitHub Actions", "GitLab CI"] },
+  { name: "Terraform", category: "Cloud & DevOps", aliases: ["IaC"] },
+  { name: "Linux", category: "Cloud & DevOps", aliases: ["Ubuntu", "Bash", "Shell"] },
   { name: "Nginx", category: "Cloud & DevOps" },
   { name: "Vercel", category: "Cloud & DevOps" },
-  { name: "Cloudflare", category: "Cloud & DevOps" },
-  { name: "Serverless", category: "Cloud & DevOps", aliases: ["AWS Lambda"] },
 
   // --- AI & DATA ---
   { name: "Machine Learning", category: "AI & Data", aliases: ["ML"] },
   { name: "Deep Learning", category: "AI & Data", aliases: ["DL"] },
-  { name: "Artificial Intelligence", category: "AI & Data", aliases: ["AI"] },
-  { name: "Data Science", category: "AI & Data" },
-  { name: "Data Analysis", category: "AI & Data", aliases: ["Data Analytics"] },
-  { name: "Natural Language Processing", category: "AI & Data", aliases: ["NLP"] },
-  { name: "Computer Vision", category: "AI & Data", aliases: ["CV"] },
-  { name: "Generative AI", category: "AI & Data", aliases: ["GenAI", "LLMs"] },
-  { name: "TensorFlow", category: "AI & Data" },
   { name: "PyTorch", category: "AI & Data" },
+  { name: "TensorFlow", category: "AI & Data", aliases: ["TF", "Keras"] },
+  { name: "OpenCV", category: "AI & Data", aliases: ["Computer Vision", "CV"] },
+  { name: "Natural Language Processing", category: "AI & Data", aliases: ["NLP"] },
+  { name: "Large Language Models", category: "AI & Data", aliases: ["LLM", "Generative AI", "LangChain"] },
+  { name: "Data Science", category: "AI & Data" },
   { name: "Pandas", category: "AI & Data" },
   { name: "NumPy", category: "AI & Data" },
-  { name: "Scikit-learn", category: "AI & Data", aliases: ["sklearn"] },
-  { name: "OpenCV", category: "AI & Data" },
-  { name: "Hugging Face", category: "AI & Data" },
-  { name: "LangChain", category: "AI & Data" },
+  { name: "Scikit-Learn", category: "AI & Data", aliases: ["sklearn"] },
+  { name: "Data Visualization", category: "AI & Data", aliases: ["Matplotlib", "Seaborn", "Tableau"] },
+  { name: "R", category: "AI & Data" },
 
   // --- CYBERSECURITY ---
-  { name: "Cybersecurity", category: "Cybersecurity", aliases: ["InfoSec"] },
+  { name: "Ethical Hacking", category: "Cybersecurity", aliases: ["Penetration Testing", "PenTest"] },
   { name: "Network Security", category: "Cybersecurity" },
-  { name: "Ethical Hacking", category: "Cybersecurity" },
-  { name: "Penetration Testing", category: "Cybersecurity", aliases: ["PenTesting"] },
   { name: "Cryptography", category: "Cybersecurity" },
-  { name: "OWASP", category: "Cybersecurity" },
-  { name: "Security Auditing", category: "Cybersecurity" },
+  { name: "Web Application Security", category: "Cybersecurity", aliases: ["OWASP"] },
+  { name: "Reverse Engineering", category: "Cybersecurity" },
+  { name: "SIEM & SOC", category: "Cybersecurity" },
 
   // --- HARDWARE & SYSTEMS ---
   { name: "Arduino", category: "Hardware & Systems" },
   { name: "Raspberry Pi", category: "Hardware & Systems" },
-  { name: "Embedded Systems", category: "Hardware & Systems", aliases: ["Embedded C"] },
   { name: "Internet of Things", category: "Hardware & Systems", aliases: ["IoT"] },
+  { name: "Embedded C", category: "Hardware & Systems" },
   { name: "Robotics", category: "Hardware & Systems", aliases: ["ROS"] },
-  { name: "MATLAB", category: "Hardware & Systems" },
-  { name: "Simulink", category: "Hardware & Systems" },
-  { name: "PCB Design", category: "Hardware & Systems", aliases: ["KiCAD", "Altium"] },
-  { name: "CAD Modeling", category: "Hardware & Systems", aliases: ["SolidWorks", "AutoCAD"] },
-  { name: "3D Printing", category: "Hardware & Systems" },
-  { name: "Microcontrollers", category: "Hardware & Systems", aliases: ["STM32", "ESP32"] },
+  { name: "FPGA & Verilog", category: "Hardware & Systems" },
+  { name: "PCB Design", category: "Hardware & Systems", aliases: ["Altium", "KiCad"] },
 
   // --- DESIGN & PRODUCT ---
-  { name: "UI/UX Design", category: "Design & Product", aliases: ["UI/UX", "User Interface"] },
   { name: "Figma", category: "Design & Product" },
+  { name: "UI/UX Design", category: "Design & Product", aliases: ["User Interface", "User Experience"] },
   { name: "Product Design", category: "Design & Product" },
-  { name: "Graphic Design", category: "Design & Product" },
-  { name: "Wireframing & Prototyping", category: "Design & Product", aliases: ["Prototyping"] },
-  { name: "Product Management", category: "Design & Product", aliases: ["PM"] },
-  { name: "Technical Writing", category: "Design & Product", aliases: ["Documentation"] },
-  { name: "User Research", category: "Design & Product" },
-  { name: "Adobe XD", category: "Design & Product" },
-  { name: "Photoshop", category: "Design & Product" },
-  { name: "Illustrator", category: "Design & Product" },
-]
-
-export const SKILL_CATEGORIES: SkillCategory[] = [
-  "Frontend",
-  "Backend",
-  "Mobile",
-  "Databases",
-  "Cloud & DevOps",
-  "AI & Data",
-  "Cybersecurity",
-  "Hardware & Systems",
-  "Design & Product",
+  { name: "Graphic Design", category: "Design & Product", aliases: ["Photoshop", "Illustrator"] },
+  { name: "Wireframing & Prototyping", category: "Design & Product" },
+  { name: "Design Systems", category: "Design & Product" },
+  { name: "Pitching & Presentation", category: "Design & Product" },
+  { name: "Product Management", category: "Design & Product", aliases: ["Agile", "Scrum"] },
 ]
 
 // ============================================================================
-// 2. SQUAD RECRUITMENT ROLES (Categorized)
+// 2. AUTHORITATIVE TEAM & PROFILE ROLES
 // ============================================================================
 
 export interface RoleTemplate {
   name: string
-  category: "Engineering" | "Design & Product" | "Data & AI" | "Hardware & Security" | "Leadership & Other"
+  category: "Engineering" | "Data & AI" | "Design & Product" | "Hardware & Security" | "Leadership & Other"
+  description: string
   defaultSkills: string[]
 }
 
 export const AUTHORITATIVE_ROLES: RoleTemplate[] = [
   // Engineering
-  { name: "Frontend Developer", category: "Engineering", defaultSkills: ["React", "TypeScript", "Tailwind CSS"] },
-  { name: "Backend Developer", category: "Engineering", defaultSkills: ["Node.js", "PostgreSQL", "REST APIs"] },
-  { name: "Full Stack Developer", category: "Engineering", defaultSkills: ["Next.js", "TypeScript", "PostgreSQL"] },
-  { name: "Mobile App Developer", category: "Engineering", defaultSkills: ["Flutter", "React Native", "Firebase"] },
-  { name: "Android Developer", category: "Engineering", defaultSkills: ["Kotlin", "Android", "Jetpack Compose"] },
-  { name: "iOS Developer", category: "Engineering", defaultSkills: ["Swift", "SwiftUI", "iOS"] },
-  { name: "DevOps & Cloud Engineer", category: "Engineering", defaultSkills: ["Docker", "Kubernetes", "AWS"] },
-  { name: "QA & Automation Engineer", category: "Engineering", defaultSkills: ["Python", "CI/CD", "TypeScript"] },
-  { name: "Blockchain / Web3 Developer", category: "Engineering", defaultSkills: ["Rust", "TypeScript", "Cryptography"] },
+  {
+    name: "Frontend Developer",
+    category: "Engineering",
+    description: "Builds responsive, accessible web interfaces and user-facing clients.",
+    defaultSkills: ["React", "TypeScript", "Next.js", "Tailwind CSS", "HTML5"],
+  },
+  {
+    name: "Backend Developer",
+    category: "Engineering",
+    description: "Architects scalable server APIs, business logic, and database schemas.",
+    defaultSkills: ["Node.js", "Python", "PostgreSQL", "REST APIs", "Docker"],
+  },
+  {
+    name: "Full Stack Developer",
+    category: "Engineering",
+    description: "Builds end-to-end features spanning client interfaces and server services.",
+    defaultSkills: ["React", "TypeScript", "Node.js", "PostgreSQL", "Next.js"],
+  },
+  {
+    name: "Mobile Developer",
+    category: "Engineering",
+    description: "Builds cross-platform or native mobile apps for iOS and Android.",
+    defaultSkills: ["React Native", "Flutter", "Kotlin", "Swift", "Dart"],
+  },
+  {
+    name: "Android Developer",
+    category: "Engineering",
+    description: "Builds native Android applications using Kotlin and Jetpack Compose.",
+    defaultSkills: ["Kotlin", "Android", "Jetpack Compose", "Java Android"],
+  },
+  {
+    name: "iOS Developer",
+    category: "Engineering",
+    description: "Builds native iOS applications using Swift and SwiftUI.",
+    defaultSkills: ["Swift", "SwiftUI", "iOS"],
+  },
+  {
+    name: "DevOps / Cloud Engineer",
+    category: "Engineering",
+    description: "Manages infrastructure, CI/CD pipelines, containerization, and deployments.",
+    defaultSkills: ["Docker", "Kubernetes", "AWS", "CI/CD", "Linux"],
+  },
 
   // Data & AI
-  { name: "AI / ML Engineer", category: "Data & AI", defaultSkills: ["Python", "PyTorch", "Machine Learning"] },
-  { name: "Data Scientist", category: "Data & AI", defaultSkills: ["Python", "Pandas", "Scikit-learn"] },
-  { name: "Data Analyst", category: "Data & AI", defaultSkills: ["SQL", "Python", "Data Analysis"] },
-  { name: "NLP / LLM Specialist", category: "Data & AI", defaultSkills: ["Python", "Generative AI", "PyTorch"] },
-  { name: "Computer Vision Engineer", category: "Data & AI", defaultSkills: ["Python", "OpenCV", "Deep Learning"] },
+  {
+    name: "AI / ML Engineer",
+    category: "Data & AI",
+    description: "Trains, fine-tunes, and deploys machine learning and deep learning models.",
+    defaultSkills: ["Python", "PyTorch", "TensorFlow", "Machine Learning", "FastAPI"],
+  },
+  {
+    name: "Data Scientist",
+    category: "Data & AI",
+    description: "Extracts insights from large datasets using statistical modeling and analytics.",
+    defaultSkills: ["Python", "Pandas", "Scikit-Learn", "Data Science", "SQL"],
+  },
+  {
+    name: "Data Analyst",
+    category: "Data & AI",
+    description: "Transforms raw data into dashboards, reports, and actionable metrics.",
+    defaultSkills: ["SQL", "Python", "Data Visualization", "Pandas"],
+  },
 
   // Hardware & Security
-  { name: "Embedded Systems Engineer", category: "Hardware & Security", defaultSkills: ["C++", "Embedded Systems", "Arduino"] },
-  { name: "Robotics Engineer", category: "Hardware & Security", defaultSkills: ["Robotics", "C++", "Python"] },
-  { name: "IoT Engineer", category: "Hardware & Security", defaultSkills: ["Internet of Things", "Raspberry Pi", "Python"] },
-  { name: "Cybersecurity Specialist", category: "Hardware & Security", defaultSkills: ["Cybersecurity", "Network Security", "Linux"] },
+  {
+    name: "Cybersecurity Specialist",
+    category: "Hardware & Security",
+    description: "Audits security posture, penetration tests web apps, and ensures data safety.",
+    defaultSkills: ["Ethical Hacking", "Network Security", "Web Application Security", "Linux"],
+  },
+  {
+    name: "Embedded Systems Engineer",
+    category: "Hardware & Security",
+    description: "Programs microcontrollers, firmware, and low-level hardware devices.",
+    defaultSkills: ["C", "C++", "Embedded C", "Arduino", "PCB Design"],
+  },
+  {
+    name: "Robotics Engineer",
+    category: "Hardware & Security",
+    description: "Develops robotic kinematics, perception algorithms, and control systems.",
+    defaultSkills: ["Robotics", "ROS", "C++", "Python", "OpenCV"],
+  },
+  {
+    name: "IoT Engineer",
+    category: "Hardware & Security",
+    description: "Connects smart physical sensors and devices to cloud telemetry.",
+    defaultSkills: ["Internet of Things", "Raspberry Pi", "Arduino", "MQTT", "Python"],
+  },
 
   // Design & Product
-  { name: "UI/UX Designer", category: "Design & Product", defaultSkills: ["Figma", "UI/UX Design", "Wireframing & Prototyping"] },
-  { name: "Product Designer", category: "Design & Product", defaultSkills: ["Figma", "Product Design", "User Research"] },
-  { name: "Graphic & Brand Designer", category: "Design & Product", defaultSkills: ["Graphic Design", "Illustrator", "Photoshop"] },
+  {
+    name: "UI/UX Designer",
+    category: "Design & Product",
+    description: "Designs wireframes, design systems, interactive prototypes, and user flows.",
+    defaultSkills: ["Figma", "UI/UX Design", "Wireframing & Prototyping", "Design Systems"],
+  },
+  {
+    name: "Product Designer",
+    category: "Design & Product",
+    description: "Balances visual aesthetics, usability testing, and strategic product requirements.",
+    defaultSkills: ["Figma", "Product Design", "UI/UX Design"],
+  },
+  {
+    name: "Graphic Designer",
+    category: "Design & Product",
+    description: "Creates visual branding, marketing assets, vector graphics, and illustrations.",
+    defaultSkills: ["Graphic Design", "Figma"],
+  },
+  {
+    name: "Product Manager",
+    category: "Design & Product",
+    description: "Defines product vision, sprint roadmaps, user stories, and feature prioritization.",
+    defaultSkills: ["Product Management", "Agile", "Wireframing & Prototyping"],
+  },
+  {
+    name: "Project Manager",
+    category: "Design & Product",
+    description: "Coordinates team deliverables, timeline milestones, and task tracking.",
+    defaultSkills: ["Product Management", "Agile"],
+  },
 
   // Leadership & Other
-  { name: "Product Manager", category: "Leadership & Other", defaultSkills: ["Product Management", "Wireframing & Prototyping"] },
-  { name: "Project Coordinator", category: "Leadership & Other", defaultSkills: ["Product Management", "Technical Writing"] },
-  { name: "Technical Writer & Docs", category: "Leadership & Other", defaultSkills: ["Technical Writing"] },
-  { name: "Pitch & Presentation Lead", category: "Leadership & Other", defaultSkills: ["Product Management"] },
+  {
+    name: "Technical Writer",
+    category: "Leadership & Other",
+    description: "Authors API documentation, system architecture guides, and user manuals.",
+    defaultSkills: ["Documentation", "Markdown", "REST APIs"],
+  },
+  {
+    name: "Researcher",
+    category: "Leadership & Other",
+    description: "Conducts domain research, literature reviews, and empirical benchmarking.",
+    defaultSkills: ["Data Science", "Python", "Data Visualization"],
+  },
+  {
+    name: "Pitch / Presentation Lead",
+    category: "Leadership & Other",
+    description: "Crafts the pitch deck, delivers demo presentations, and handles investor Q&A.",
+    defaultSkills: ["Pitching & Presentation", "Figma", "Product Management"],
+  },
 ]
 
 // ============================================================================
-// 3. DEPARTMENTS & ACADEMIC BRANCHES
+// 3. ACADEMIC PROGRAMS & BRANCHES (SEPARATE & CONDITIONAL)
 // ============================================================================
 
-export interface DepartmentOption {
+export interface ProgramOption {
   code: string
   name: string
-  category: "Computer & Info" | "Electrical & Electronics" | "Mechanical & Core" | "Interdisciplinary & Sciences" | "Design & Management"
+  branches: string[]
 }
 
-export const AUTHORITATIVE_DEPARTMENTS: DepartmentOption[] = [
-  // Computer & Info
-  { code: "CSE", name: "Computer Science & Engineering", category: "Computer & Info" },
-  { code: "IT", name: "Information Technology", category: "Computer & Info" },
-  { code: "AIML", name: "Artificial Intelligence & Machine Learning", category: "Computer & Info" },
-  { code: "DS", name: "Data Science & Big Data", category: "Computer & Info" },
-  { code: "CSBS", name: "Computer Science & Business Systems", category: "Computer & Info" },
-  { code: "CYBER", name: "Cybersecurity & Information Security", category: "Computer & Info" },
-  { code: "SWE", name: "Software Engineering", category: "Computer & Info" },
-
-  // Electrical & Electronics
-  { code: "ECE", name: "Electronics & Communication Engineering", category: "Electrical & Electronics" },
-  { code: "EEE", name: "Electrical & Electronics Engineering", category: "Electrical & Electronics" },
-  { code: "ICE", name: "Instrumentation & Control Engineering", category: "Electrical & Electronics" },
-  { code: "EIE", name: "Electronics & Instrumentation Engineering", category: "Electrical & Electronics" },
-
-  // Mechanical & Core
-  { code: "MECH", name: "Mechanical Engineering", category: "Mechanical & Core" },
-  { code: "CIVIL", name: "Civil & Environmental Engineering", category: "Mechanical & Core" },
-  { code: "AERO", name: "Aerospace & Aeronautical Engineering", category: "Mechanical & Core" },
-  { code: "AUTO", name: "Automobile Engineering", category: "Mechanical & Core" },
-  { code: "ROBO", name: "Robotics & Automation", category: "Mechanical & Core" },
-  { code: "MECHATRONICS", name: "Mechatronics Engineering", category: "Mechanical & Core" },
-  { code: "CHEM", name: "Chemical Engineering", category: "Mechanical & Core" },
-  { code: "PROD", name: "Production & Industrial Engineering", category: "Mechanical & Core" },
-
-  // Interdisciplinary & Sciences
-  { code: "BIOTECH", name: "Biotechnology & Bioinformatics", category: "Interdisciplinary & Sciences" },
-  { code: "BME", name: "Biomedical Engineering", category: "Interdisciplinary & Sciences" },
-  { code: "MATH", name: "Mathematics & Computing", category: "Interdisciplinary & Sciences" },
-  { code: "PHYSICS", name: "Engineering Physics / Applied Sciences", category: "Interdisciplinary & Sciences" },
-
-  // Design & Management
-  { code: "DESIGN", name: "Design, Animation & Media Arts", category: "Design & Management" },
-  { code: "MGMT", name: "Business Administration & Management", category: "Design & Management" },
-  { code: "OTHER", name: "Other Academic Department", category: "Design & Management" },
+export const AUTHORITATIVE_PROGRAMS: ProgramOption[] = [
+  {
+    code: "BTECH_BE",
+    name: "B.Tech / B.E.",
+    branches: [
+      "Computer Science and Engineering (CSE)",
+      "Information Technology (IT)",
+      "Artificial Intelligence and Data Science",
+      "Artificial Intelligence and Machine Learning",
+      "Electronics and Communication Engineering (ECE)",
+      "Electrical Engineering",
+      "Mechanical Engineering",
+      "Civil Engineering",
+      "Chemical Engineering",
+      "Aerospace Engineering",
+      "Automobile Engineering",
+      "Robotics and Automation",
+      "Mechatronics Engineering",
+      "Biotechnology",
+      "Biomedical Engineering",
+      "Electronics and Instrumentation",
+      "Instrumentation and Control",
+      "Production / Industrial Engineering",
+      "Other",
+    ],
+  },
+  {
+    code: "BCA",
+    name: "BCA",
+    branches: ["BCA", "Other / General"],
+  },
+  {
+    code: "BBA",
+    name: "BBA",
+    branches: ["BBA", "Other / General"],
+  },
+  {
+    code: "BPHARM",
+    name: "B.Pharm",
+    branches: ["B.Pharm", "Other / General"],
+  },
+  {
+    code: "BSC",
+    name: "B.Sc.",
+    branches: [
+      "Computer Science",
+      "Data Science",
+      "Mathematics",
+      "Physics",
+      "Chemistry",
+      "Biotechnology",
+      "Agriculture",
+      "Other",
+    ],
+  },
+  {
+    code: "BCOM",
+    name: "B.Com",
+    branches: [
+      "General / Accounting & Finance",
+      "Banking & Insurance",
+      "Computer Applications",
+      "Other",
+    ],
+  },
+  {
+    code: "BA",
+    name: "BA",
+    branches: [
+      "Economics",
+      "English",
+      "Psychology",
+      "Political Science",
+      "Journalism & Mass Comm",
+      "Other",
+    ],
+  },
+  {
+    code: "DIPLOMA",
+    name: "Diploma",
+    branches: [
+      "Computer Engineering",
+      "Mechanical Engineering",
+      "Electrical Engineering",
+      "Civil Engineering",
+      "Electronics Engineering",
+      "Chemical Engineering",
+      "Automobile Engineering",
+      "Other",
+    ],
+  },
+  {
+    code: "MTECH_ME",
+    name: "M.Tech / M.E.",
+    branches: [
+      "Computer Science & Engineering",
+      "AI & Data Science",
+      "VLSI & Embedded Systems",
+      "Thermal / Mechanical Engineering",
+      "Structural / Civil Engineering",
+      "Power Systems / Electrical",
+      "Biotechnology",
+      "Other",
+    ],
+  },
+  {
+    code: "MCA",
+    name: "MCA",
+    branches: ["MCA", "Other / General"],
+  },
+  {
+    code: "MBA",
+    name: "MBA",
+    branches: [
+      "Finance",
+      "Marketing",
+      "Human Resources",
+      "Operations & Supply Chain",
+      "Business Analytics",
+      "Information Technology",
+      "Other",
+    ],
+  },
+  {
+    code: "MPHARM",
+    name: "M.Pharm",
+    branches: [
+      "Pharmaceutics",
+      "Pharmacology",
+      "Pharmaceutical Chemistry",
+      "Other",
+    ],
+  },
+  {
+    code: "MSC",
+    name: "M.Sc.",
+    branches: [
+      "Computer Science",
+      "Data Science",
+      "Mathematics",
+      "Physics",
+      "Chemistry",
+      "Biotechnology",
+      "Other",
+    ],
+  },
+  {
+    code: "PHD",
+    name: "PhD",
+    branches: [
+      "Computer Science & AI",
+      "Engineering & Technology",
+      "Basic Sciences & Mathematics",
+      "Management & Business",
+      "Pharmacy & Health Sciences",
+      "Humanities & Social Sciences",
+      "Other",
+    ],
+  },
+  {
+    code: "OTHER",
+    name: "Other",
+    branches: ["General / Other Specialization"],
+  },
 ]
+
+export function getBranchesForProgram(programNameOrCode: string): string[] {
+  if (!programNameOrCode) return []
+  const prog = AUTHORITATIVE_PROGRAMS.find(
+    (p) => p.name === programNameOrCode || p.code === programNameOrCode
+  )
+  return prog ? prog.branches : ["General / Other"]
+}
+
+// Flat departments list for filter compatibility
+export const AUTHORITATIVE_DEPARTMENTS = AUTHORITATIVE_PROGRAMS.flatMap((p) =>
+  p.branches.map((b) => ({
+    code: p.code,
+    name: p.name === b ? b : `${p.name} - ${b}`,
+    program: p.name,
+    branch: b,
+  }))
+)
+
+// Profile role parsing and bio formatting helpers (100% schema-safe)
+export function parseProfileRole(bio?: string | null): { role: string | null; cleanBio: string } {
+  if (!bio) return { role: null, cleanBio: "" }
+  const match = bio.match(/^\[Role:\s*(.*?)\]\s*\n?([\s\S]*)$/)
+  if (match) {
+    return { role: match[1].trim() || null, cleanBio: match[2].trim() }
+  }
+  return { role: null, cleanBio: bio }
+}
+
+export function formatProfileBio(role?: string | null, bio?: string | null): string {
+  const clean = bio?.trim() || ""
+  if (role && role.trim()) {
+    return `[Role: ${role.trim()}]${clean ? `\n${clean}` : ""}`.trim()
+  }
+  return clean
+}
 
 // ============================================================================
 // 4. ACADEMIC YEARS
