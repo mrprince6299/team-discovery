@@ -11,6 +11,7 @@ import {
   Mail,
   CheckCircle2,
   ExternalLink,
+  ShieldCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -32,6 +33,7 @@ export interface Candidate {
   college?: { id: string; name: string } | null
   matchCategory: "EXACT" | "RELATED" | "INTEREST_ONLY"
   experienceLevel: "BEGINNER" | "SOME_EXPERIENCE" | "EXPERIENCED" | string
+  verificationStatus?: string
   matchedRequiredSkills: Array<{ id: string; name: string; level: string }>
   matchedRelatedSkills: Array<{ id: string; name: string; level: string; relatedToRequired?: string }>
   matchedInterests: Array<{ id: string; name: string }>
@@ -84,7 +86,15 @@ export function CandidateCard({
               <AvatarFallback className="font-bold text-sm bg-muted">{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <h3 className="font-bold text-base text-foreground leading-tight">{candidate.name}</h3>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h3 className="font-bold text-base text-foreground leading-tight">{candidate.name}</h3>
+                {candidate.verificationStatus === "APPROVED" && (
+                  <Badge variant="success" className="text-[9px] uppercase font-semibold py-0 px-1.5 gap-0.5">
+                    <ShieldCheck className="size-2.5" />
+                    <span>Verified</span>
+                  </Badge>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground font-medium">@{candidate.username}</p>
             </div>
           </div>

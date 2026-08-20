@@ -538,10 +538,18 @@ export function ProfileEditorClient({
             </div>
 
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs uppercase tracking-wider font-semibold text-emerald-700 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10">
-                <ShieldCheck className="size-3.5 mr-1" />
-                <span>Beta Active</span>
-              </Badge>
+              <Button asChild size="sm" variant={profile.verificationStatus === "APPROVED" ? "outline" : "default"} className="h-8 gap-1.5 text-xs shadow-xs font-semibold">
+                <Link href="/verify/student">
+                  <ShieldCheck className="size-3.5 text-emerald-500" />
+                  <span>
+                    {profile.verificationStatus === "APPROVED"
+                      ? "Verified Student"
+                      : profile.verificationStatus === "PENDING"
+                      ? "Verification Pending"
+                      : "Get Verified"}
+                  </span>
+                </Link>
+              </Button>
             </div>
           </div>
 

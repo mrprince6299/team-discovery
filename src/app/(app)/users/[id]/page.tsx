@@ -25,6 +25,7 @@ import {
   Building,
   Briefcase,
   Edit3,
+  ShieldCheck,
 } from "lucide-react"
 
 interface PublicProfilePageProps {
@@ -98,12 +99,15 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
                       <span>{profileRole}</span>
                     </Badge>
                   )}
-                  <Badge
-                    variant={isVerified ? "success" : "outline"}
-                    className="text-[10px] uppercase font-semibold"
-                  >
-                    {isVerified ? "Verified Student" : "Pending Verification"}
-                  </Badge>
+                  {isVerified && (
+                    <Badge
+                      variant="success"
+                      className="text-[10px] uppercase font-semibold gap-1 py-0.5 px-2"
+                    >
+                      <ShieldCheck className="size-3" />
+                      <span>Verified Student</span>
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground font-medium">@{profile.username}</p>
               </div>

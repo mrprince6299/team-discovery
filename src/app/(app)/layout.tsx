@@ -14,7 +14,7 @@ export default async function AppLayout({
 
   let userSession = null
   if (authUser) {
-    const [dbUser, unreadCount] = await Promise.all([
+    const [dbUser, unreadCount, adminRole] = await Promise.all([
       prisma.user.findUnique({
         where: { id: authUser.id },
         select: {
@@ -28,6 +28,10 @@ export default async function AppLayout({
       prisma.notification.count({
         where: { userId: authUser.id, isRead: false },
       }),
+      prisma.userRole.findFirst({
+        where: { userId: authUser.id, role: "ADMIN" },
+        select: { id: true },
+      }),
     ])
 
     if (dbUser) {
@@ -38,6 +42,7 @@ export default async function AppLayout({
         verificationStatus: dbUser.verificationStatus,
         avatarUrl: dbUser.profilePhoto,
         unreadNotificationsCount: unreadCount,
+        isAdmin: !!adminRole,
       }
     }
   }

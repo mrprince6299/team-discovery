@@ -303,23 +303,36 @@ export async function getMatchedCandidatesForRole(roleId: string) {
     else if (hasInterest) buckets.INTEREST_ONLY.push(processedCandidate)
   }
 
-  // Strict Intra-Bucket Sorting
+  // Strict Intra-Bucket Sorting with Modest Verification Trust Signal
   const sortCandidates = (a: any, b: any) => {
+    // 1. Required skills coverage count (primary relevance)
     if (a.matchMetrics.requiredCoverage !== b.matchMetrics.requiredCoverage)
       return b.matchMetrics.requiredCoverage - a.matchMetrics.requiredCoverage
 
+    // 2. Proficiency fit
     if (a.matchMetrics.levelFit !== b.matchMetrics.levelFit)
       return b.matchMetrics.levelFit - a.matchMetrics.levelFit
 
+    // 3. Experience fit (projects with relevant skills)
     if (a.matchMetrics.expFit !== b.matchMetrics.expFit)
       return b.matchMetrics.expFit - a.matchMetrics.expFit
 
+    // 4. Availability fit
     if (a.matchMetrics.availFit !== b.matchMetrics.availFit)
       return b.matchMetrics.availFit - a.matchMetrics.availFit
 
+    // 5. Modest Verification Trust Signal (tie-breaker among otherwise equal matches)
+    const aVerified = a.verificationStatus === 'APPROVED' ? 1 : 0
+    const bVerified = b.verificationStatus === 'APPROVED' ? 1 : 0
+    if (aVerified !== bVerified) {
+      return bVerified - aVerified
+    }
+
+    // 6. Portfolio volume
     if (a.matchMetrics.projectCount !== b.matchMetrics.projectCount)
       return b.matchMetrics.projectCount - a.matchMetrics.projectCount
 
+    // 7. Peer rating
     return b.matchMetrics.avgRating - a.matchMetrics.avgRating
   }
 

@@ -38,6 +38,7 @@ export interface UserSession {
   verificationStatus: string
   avatarUrl?: string | null
   unreadNotificationsCount?: number
+  isAdmin?: boolean
 }
 
 interface NavbarProps {
@@ -186,11 +187,17 @@ export function Navbar({ user, onLogout }: NavbarProps) {
                         <span>Profile & Skills</span>
                       </Link>
                     </DropdownMenuItem>
-                    {!isVerified && (
+                    <DropdownMenuItem asChild>
+                      <Link href="/verify/student" className="flex items-center gap-2 cursor-pointer text-emerald-600 dark:text-emerald-400">
+                        <ShieldCheck className="size-4" />
+                        <span>Student Verification</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    {user?.isAdmin && (
                       <DropdownMenuItem asChild>
-                        <Link href="/verify" className="flex items-center gap-2 cursor-pointer text-amber-600">
+                        <Link href="/admin/verify" className="flex items-center gap-2 cursor-pointer text-primary font-semibold">
                           <ShieldCheck className="size-4" />
-                          <span>Verify Account</span>
+                          <span>Admin Verification</span>
                         </Link>
                       </DropdownMenuItem>
                     )}
