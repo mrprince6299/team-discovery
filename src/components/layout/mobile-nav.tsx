@@ -21,6 +21,8 @@ import {
   Layers,
   BarChart3,
   Sparkles,
+  Flag,
+  ShieldAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -60,6 +62,7 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     { label: "My Applications", href: "/applications", icon: FileText },
     { label: "Invitations", href: "/invitations", icon: Mail },
+    { label: "My Reports", href: "/reports", icon: Flag },
     {
       label: "Notifications",
       href: "/notifications",
@@ -74,6 +77,7 @@ export function MobileNav({ user, onLogout }: MobileNavProps) {
     { label: "Teams", href: "/admin/teams", icon: Layers },
     { label: "Events & Hackathons", href: "/admin/events", icon: Calendar },
     { label: "Verification", href: "/admin/verify", icon: ShieldCheck },
+    { label: "Reports & Moderation", href: "/admin/reports", icon: ShieldAlert },
     { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { label: "Skills & Roles", href: "/admin/taxonomy", icon: Sparkles },
   ]

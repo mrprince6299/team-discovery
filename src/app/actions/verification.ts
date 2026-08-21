@@ -139,6 +139,10 @@ export async function submitStudentVerificationRequest(): Promise<{
     return { error: 'User record not found' }
   }
 
+  if (user.isSuspended) {
+    return { error: 'Your account is currently suspended.' }
+  }
+
   // Admin accounts do not participate in student verification
   const isAdmin = await isCurrentUserAdmin()
   if (isAdmin) {

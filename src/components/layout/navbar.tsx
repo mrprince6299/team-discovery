@@ -8,7 +8,6 @@ import {
   Users,
   Calendar,
   LayoutDashboard,
-  Bell,
   PlusCircle,
   LogOut,
   User as UserIcon,
@@ -18,6 +17,8 @@ import {
   Layers,
   BarChart3,
   Sparkles,
+  Flag,
+  ShieldAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -33,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { GlobalSearchDialog } from "@/components/search/global-search-dialog"
+import { NavbarNotificationDropdown } from "@/components/notifications/navbar-notification-dropdown"
 import { cn } from "@/lib/utils"
 
 export interface UserSession {
@@ -68,6 +70,7 @@ export function Navbar({ user, onLogout }: NavbarProps) {
     { label: "Teams", href: "/admin/teams", icon: Layers },
     { label: "Events", href: "/admin/events", icon: Calendar },
     { label: "Verification", href: "/admin/verify", icon: ShieldCheck },
+    { label: "Reports", href: "/admin/reports", icon: ShieldAlert },
     { label: "Analytics", href: "/admin/analytics", icon: BarChart3 },
     { label: "Taxonomy", href: "/admin/taxonomy", icon: Sparkles },
   ]
@@ -180,24 +183,9 @@ export function Navbar({ user, onLogout }: NavbarProps) {
                 )
               )}
 
-              {/* Notification Bell (Only in student view) */}
+              {/* Notification Dropdown (Only in student view) */}
               {!isAdminConsole && (
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="icon"
-                  className="relative text-muted-foreground hover:text-foreground"
-                  aria-label={`Notifications${(user.unreadNotificationsCount ?? 0) > 0 ? ` (${user.unreadNotificationsCount} unread)` : ""}`}
-                >
-                  <Link href="/notifications">
-                    <Bell className="size-4" />
-                    {(user.unreadNotificationsCount ?? 0) > 0 && (
-                      <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-bold text-white ring-2 ring-background">
-                        {user.unreadNotificationsCount! > 99 ? "99+" : user.unreadNotificationsCount}
-                      </span>
-                    )}
-                  </Link>
-                </Button>
+                <NavbarNotificationDropdown initialUnreadCount={user.unreadNotificationsCount} />
               )}
 
               {/* User Avatar Menu */}
@@ -253,6 +241,12 @@ export function Navbar({ user, onLogout }: NavbarProps) {
                       <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer">
                         <Compass className="size-4" />
                         <span>Student Platform</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/reports" className="flex items-center gap-2 cursor-pointer">
+                        <Flag className="size-4" />
+                        <span>My Reports</span>
                       </Link>
                     </DropdownMenuItem>
                   </DropdownMenuGroup>

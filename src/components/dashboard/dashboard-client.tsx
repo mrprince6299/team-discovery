@@ -12,6 +12,8 @@ import {
   Compass,
   PlusCircle,
   Award,
+  Sparkles,
+  ArrowRight,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -155,6 +157,60 @@ export function DashboardClient({ data }: DashboardClientProps) {
           </div>
         </div>
       </div>
+
+      {/* 1.5. Profile Setup Guidance Card (Non-blocking) */}
+      {data.profileSetup && !data.profileSetup.isComplete && (
+        <Card className="border-primary/30 bg-gradient-to-r from-primary/5 via-card to-card rounded-2xl p-5 shadow-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="size-4 text-primary shrink-0" />
+                <span className="font-bold text-sm text-foreground">
+                  Complete Your Teammate Profile
+                </span>
+                <Badge variant="secondary" className="text-[10px] px-2 py-0 font-mono">
+                  {data.profileSetup.completedCount} / {data.profileSetup.totalCount} Complete ({data.profileSetup.percentage}%)
+                </Badge>
+              </div>
+
+              {/* Progress bar */}
+              <div className="w-full max-w-md h-2 rounded-full bg-muted overflow-hidden">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{ width: `${data.profileSetup.percentage}%` }}
+                />
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Add your primary role, technical skills, and academic major so team leaders can match you to open hackathon roles.
+              </p>
+
+              {data.profileSetup.missingFields.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground pt-0.5">
+                  <span className="font-semibold">Suggested next:</span>
+                  {data.profileSetup.missingFields.slice(0, 3).map((f) => (
+                    <Badge key={f} variant="outline" className="text-[10px] px-1.5 py-0 border-border/80">
+                      {f}
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <Button asChild size="sm" className="font-semibold text-xs gap-1.5 shadow-xs">
+                <Link href="/onboarding">
+                  <span>Start Guided Setup</span>
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="sm" className="text-xs">
+                <Link href="/profile">Edit Profile</Link>
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* 2. Compact Metrics Strip */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">

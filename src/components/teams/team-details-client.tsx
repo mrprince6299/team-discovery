@@ -16,6 +16,7 @@ import {
   MessageSquare,
   PlusCircle,
   LogOut,
+  Flag,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -27,6 +28,7 @@ import { ApplyModal } from "./apply-modal"
 import { RoleManagementDialog } from "./role-management-dialog"
 import { LeaveTeamDialog } from "./leave-team-dialog"
 import { TransferLeadershipDialog, type EligibleMember } from "./transfer-leadership-dialog"
+import { ReportModal } from "@/components/reports/report-modal"
 
 interface TeamMemberDetails {
   id: string
@@ -84,6 +86,7 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
   const [isCreateRoleModalOpen, setIsCreateRoleModalOpen] = useState(false)
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false)
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false)
   const [transferTargetMemberId, setTransferTargetMemberId] = useState<string | undefined>(undefined)
   const [hasAppliedLocally, setHasAppliedLocally] = useState(false)
 
@@ -151,8 +154,28 @@ export function TeamDetailsClient({ team }: TeamDetailsClientProps) {
             className="h-8 gap-1.5 font-medium border-border/80"
             showLabel
           />
+
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setIsReportModalOpen(true)}
+            className="text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 gap-1.5 h-8 px-2.5 rounded-xl border border-border/80"
+            title="Report Team"
+          >
+            <Flag className="size-3.5" />
+            <span className="hidden sm:inline">Report Squad</span>
+          </Button>
         </div>
       </div>
+
+      <ReportModal
+        isOpen={isReportModalOpen}
+        onOpenChange={setIsReportModalOpen}
+        targetType="TEAM"
+        targetId={team.id}
+        targetName={team.name}
+        targetContext={team.description}
+      />
 
       {/* Team Header Profile Card */}
       <Card className="rounded-3xl border border-border/80 bg-gradient-to-b from-card via-card to-muted/20 shadow-xs overflow-hidden">

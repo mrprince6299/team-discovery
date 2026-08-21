@@ -2,6 +2,7 @@
 
 import { prisma } from '@/lib/prisma'
 import { createClient } from '@/utils/supabase/server'
+import { checkVerificationReadiness } from '@/lib/verification'
 
 async function getAuthUserId(testOverrideUserId?: string): Promise<string | null> {
   if (testOverrideUserId && process.env.NODE_ENV !== 'production') {
@@ -64,6 +65,13 @@ export interface DashboardData {
     createdAt: Date
     status: string
   }>
+  profileSetup?: {
+    completedCount: number
+    totalCount: number
+    percentage: number
+    isComplete: boolean
+    missingFields: string[]
+  }
   registeredEvents: Array<{
     id: string
     name: string
@@ -95,13 +103,12 @@ export async function getDashboardData(
   try {
     const dbUser = await prisma.user.findUnique({
       where: { id: currentUserId },
-      select: {
-        id: true,
-        name: true,
-        username: true,
-        profilePhoto: true,
-        verificationStatus: true,
-        availability: true,
+      include: {
+        department: true,
+        college: true,
+        privateData: true,
+        skills: true,
+        interests: true,
       },
     })
 
@@ -253,8 +260,20 @@ export async function getDashboardData(
 
     const registeredEvents = Array.from(eventsMap.values())
 
+    const readiness = dbUser ? checkVerificationReadiness(dbUser) : undefined
+    const profileSetup = readiness
+      ? {
+          completedCount: readiness.completedCount,
+          totalCount: readiness.totalCount,
+          percentage: readiness.percentage,
+          isComplete: readiness.isReady,
+          missingFields: readiness.missingFields,
+        }
+      : undefined
+
     return {
       data: {
+        profileSetup,
         user: {
           id: dbUser.id,
           name: dbUser.name,

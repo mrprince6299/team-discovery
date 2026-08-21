@@ -42,8 +42,8 @@ export async function createApplication(input: {
       return { error: 'User not found.' }
     }
 
-    if (!isUserEligibleForCoreFeatures(user.verificationStatus)) {
-      return { error: 'You must have an APPROVED college verification to apply to teams.' }
+    if (!isUserEligibleForCoreFeatures(user.verificationStatus, user.isSuspended)) {
+      return { error: 'Account is suspended or not eligible to apply to teams.' }
     }
 
     const team = await prisma.team.findUnique({
@@ -209,6 +209,15 @@ export async function acceptApplication(applicationId: string, actorUserId?: str
 
       if (!['ACTIVE', 'PARTIALLY_FILLED'].includes(lockedRole.status)) {
         throw new Error(`Role is not open (current status: ${lockedRole.status}).`)
+      }
+
+      // Verify applicant is not suspended
+      const applicant = await tx.user.findUnique({
+        where: { id: app.userId },
+        select: { id: true, isSuspended: true },
+      })
+      if (!applicant || applicant.isSuspended) {
+        throw new Error('Cannot accept application: the applicant account is currently suspended.')
       }
 
       if (new Date() >= new Date(lockedRole.expiry)) {

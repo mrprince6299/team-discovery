@@ -886,6 +886,17 @@ export function AdminEventsClient({ initialEvents, initialCounts }: AdminEventsC
               </DialogHeader>
 
               <div className="space-y-4 text-xs">
+                {inspectEvent.bannerUrl && (
+                  <div className="relative w-full h-40 rounded-xl bg-muted overflow-hidden border border-border/80">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={inspectEvent.bannerUrl}
+                      alt={inspectEvent.name}
+                      className="w-full h-full object-cover object-center"
+                    />
+                  </div>
+                )}
+
                 {/* Description */}
                 <div className="space-y-1">
                   <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider block">

@@ -9,6 +9,7 @@ import {
   ShieldCheck,
   Sparkles,
   MessageSquare,
+  Flag,
 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -16,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { WorkspaceMessage } from "@/app/actions/workspace"
 import { sendTeamMessage } from "@/app/actions/workspace"
+import { ReportModal } from "@/components/reports/report-modal"
 import { toast } from "sonner"
 import type { MembershipRole } from "@prisma/client"
 
@@ -32,6 +34,7 @@ export function WorkspaceChat({
 }: WorkspaceChatProps) {
   const [messages, setMessages] = React.useState<WorkspaceMessage[]>(initialMessages)
   const [inputContent, setInputContent] = React.useState("")
+  const [reportingMessage, setReportingMessage] = React.useState<WorkspaceMessage | null>(null)
   const [isPending, startTransition] = React.useTransition()
   const messagesEndRef = React.useRef<HTMLDivElement | null>(null)
   const textareaRef = React.useRef<HTMLTextAreaElement | null>(null)
@@ -222,6 +225,17 @@ export function WorkspaceChat({
                       <span className="text-[10px] text-muted-foreground">
                         {formatMessageTime(msg.createdAt)}
                       </span>
+                      {!isMe && (
+                        <button
+                          type="button"
+                          onClick={() => setReportingMessage(msg)}
+                          className="text-muted-foreground/40 hover:text-destructive transition-colors p-0.5 rounded ml-1"
+                          title="Report Message"
+                          aria-label="Report Message"
+                        >
+                          <Flag className="size-2.5" />
+                        </button>
+                      )}
                     </div>
 
                     <div
@@ -241,6 +255,19 @@ export function WorkspaceChat({
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {reportingMessage && (
+        <ReportModal
+          isOpen={reportingMessage !== null}
+          onOpenChange={(open) => {
+            if (!open) setReportingMessage(null)
+          }}
+          targetType="MESSAGE"
+          targetId={reportingMessage.id}
+          targetName={`Message by ${reportingMessage.sender.name}`}
+          targetContext={reportingMessage.content}
+        />
+      )}
 
       {/* Message Composer Footer */}
       <div className="p-3 border-t border-border bg-card">

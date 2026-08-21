@@ -402,6 +402,7 @@ export async function sendTeamMessage(
             name: true,
             username: true,
             profilePhoto: true,
+            isSuspended: true,
           },
         },
       },
@@ -409,6 +410,10 @@ export async function sendTeamMessage(
 
     if (!membership) {
       return { error: 'You are not an active member of this team.' }
+    }
+
+    if (membership.user.isSuspended) {
+      return { error: 'Your account is currently suspended. Sending messages is disabled.' }
     }
 
     // 2. Find or create conversation
@@ -504,6 +509,7 @@ export async function addTeamLink(
             id: true,
             name: true,
             username: true,
+            isSuspended: true,
           },
         },
       },
@@ -511,6 +517,10 @@ export async function addTeamLink(
 
     if (!membership) {
       return { error: 'You are not an active member of this team.' }
+    }
+
+    if (membership.user.isSuspended) {
+      return { error: 'Your account is currently suspended. Adding links is disabled.' }
     }
 
     // 2. Create link & log activity
@@ -589,6 +599,10 @@ export async function deleteTeamLink(
       return { error: 'Link not found.' }
     }
 
+    const caller = await prisma.user.findUnique({ where: { id: userId }, select: { isSuspended: true } })
+    if (caller?.isSuspended) {
+      return { error: 'Your account is currently suspended. Deleting links is disabled.' }
+    }
     const isCreator = link.creatorId === userId
     const isLeadership =
       membership.membershipRole === 'LEADER' || membership.membershipRole === 'CO_LEADER'
@@ -659,6 +673,7 @@ export async function addTeamFile(
             id: true,
             name: true,
             username: true,
+            isSuspended: true,
           },
         },
       },
@@ -666,6 +681,10 @@ export async function addTeamFile(
 
     if (!membership) {
       return { error: 'You are not an active member of this team.' }
+    }
+
+    if (membership.user.isSuspended) {
+      return { error: 'Your account is currently suspended. Uploading files is disabled.' }
     }
 
     const [newFile] = await prisma.$transaction([
@@ -743,6 +762,10 @@ export async function deleteTeamFile(
       return { error: 'File not found.' }
     }
 
+    const caller = await prisma.user.findUnique({ where: { id: userId }, select: { isSuspended: true } })
+    if (caller?.isSuspended) {
+      return { error: 'Your account is currently suspended. Deleting files is disabled.' }
+    }
     const isUploader = file.uploaderId === userId
     const isLeadership =
       membership.membershipRole === 'LEADER' || membership.membershipRole === 'CO_LEADER'

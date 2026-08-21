@@ -106,7 +106,7 @@ export async function submitPeerRating(
         userId: raterId,
       },
       include: {
-        user: { select: { id: true, name: true, username: true, profilePhoto: true } },
+        user: { select: { id: true, name: true, username: true, profilePhoto: true, isSuspended: true } },
       },
     })
 
@@ -115,6 +115,10 @@ export async function submitPeerRating(
         return { error: 'Removed members are not eligible to rate teammates.' }
       }
       return { error: 'You can only rate teammates from teams you collaborated with.' }
+    }
+
+    if (raterMembership.user.isSuspended) {
+      return { error: 'Your account is currently suspended. Submitting reviews is disabled.' }
     }
 
     // 6. Verify Ratee Membership (must be ACTIVE or LEFT, not REMOVED)

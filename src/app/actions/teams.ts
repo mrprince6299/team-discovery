@@ -527,6 +527,9 @@ export async function getAvailableEvents() {
       name: true,
       description: true,
       bannerUrl: true,
+      startDate: true,
+      endDate: true,
+      teamSizeInfo: true,
       registrationDeadline: true,
       status: true,
     },
@@ -576,6 +579,20 @@ export async function transferLeadership(input: {
 
       if (targetMember.userId === leaderId) {
         throw new Error('Target user is already the team leader.')
+      }
+
+      // Verify neither caller nor target is suspended
+      const [currentLeaderUser, targetMemberUser] = await Promise.all([
+        tx.user.findUnique({ where: { id: leaderId }, select: { isSuspended: true } }),
+        tx.user.findUnique({ where: { id: input.newLeaderId }, select: { isSuspended: true } }),
+      ])
+
+      if (currentLeaderUser?.isSuspended) {
+        throw new Error('Your account is currently suspended. Leadership transfer is disabled.')
+      }
+
+      if (targetMemberUser?.isSuspended) {
+        throw new Error('Cannot transfer leadership to a suspended user account.')
       }
 
       // 3. Demote current leader to MEMBER

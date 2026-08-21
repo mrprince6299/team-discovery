@@ -1,16 +1,23 @@
 "use client"
 
 import * as React from "react"
+import Link from "next/link"
 import {
   CheckCheck,
   Inbox,
   Loader2,
   Sparkles,
+  Users,
+  Calendar,
+  ShieldCheck,
+  Star,
+  Compass,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
   NotificationItem,
+  NotificationCategory,
   markNotificationRead,
   markAllNotificationsRead,
   deleteNotification,
@@ -23,21 +30,122 @@ interface NotificationListProps {
   initialUnreadCount: number
 }
 
+const CATEGORIES: Array<{ id: NotificationCategory; label: string; icon: React.ComponentType<{ className?: string }> }> = [
+  { id: "ALL", label: "All Alerts", icon: Inbox },
+  { id: "UNREAD", label: "Unread", icon: Sparkles },
+  { id: "TEAM", label: "Squads & Roles", icon: Users },
+  { id: "EVENT", label: "Events & Hackathons", icon: Calendar },
+  { id: "VERIFICATION", label: "Verification", icon: ShieldCheck },
+  { id: "REVIEWS", label: "Peer Reviews", icon: Star },
+]
+
+function isToday(date: Date | string) {
+  const d = new Date(date)
+  const now = new Date()
+  return (
+    d.getDate() === now.getDate() &&
+    d.getMonth() === now.getMonth() &&
+    d.getFullYear() === now.getFullYear()
+  )
+}
+
+function isYesterday(date: Date | string) {
+  const d = new Date(date)
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  return (
+    d.getDate() === yesterday.getDate() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getFullYear() === yesterday.getFullYear()
+  )
+}
+
+function isThisWeek(date: Date | string) {
+  const d = new Date(date)
+  const weekAgo = new Date()
+  weekAgo.setDate(weekAgo.getDate() - 7)
+  return d > weekAgo && !isToday(d) && !isYesterday(d)
+}
+
 export function NotificationList({
   initialNotifications,
   initialUnreadCount,
 }: NotificationListProps) {
   const [notifications, setNotifications] = React.useState<NotificationItem[]>(initialNotifications)
   const [unreadCount, setUnreadCount] = React.useState<number>(initialUnreadCount)
-  const [activeFilter, setActiveFilter] = React.useState<"ALL" | "UNREAD">("ALL")
+  const [activeCategory, setActiveCategory] = React.useState<NotificationCategory>("ALL")
   const [isPending, startTransition] = React.useTransition()
 
-  const displayedNotifications = React.useMemo(() => {
-    if (activeFilter === "UNREAD") {
-      return notifications.filter((n) => !n.isRead)
+  // Filter items based on activeCategory
+  const filteredNotifications = React.useMemo(() => {
+    switch (activeCategory) {
+      case "UNREAD":
+        return notifications.filter((n) => !n.isRead)
+      case "TEAM":
+        return notifications.filter((n) =>
+          [
+            "APPLICATION_RECEIVED",
+            "APPLICATION_ACCEPTED",
+            "APPLICATION_REJECTED",
+            "APPLICATION_AUTO_CLOSED",
+            "APPLICATION_WITHDRAWN",
+            "INVITATION_RECEIVED",
+            "INVITATION_ACCEPTED",
+            "INVITATION_DECLINED",
+            "ROLE_FILLED",
+            "TEAM_FULL",
+            "ROLE_EXPIRED",
+            "LEADERSHIP_TRANSFERRED",
+          ].includes(n.type)
+        )
+      case "EVENT":
+        return notifications.filter((n) =>
+          [
+            "EVENT_ANNOUNCEMENT",
+            "EVENT_PUBLISHED",
+            "EVENT_UPDATED",
+            "REGISTRATION_OPENING",
+            "REGISTRATION_CLOSING",
+          ].includes(n.type)
+        )
+      case "VERIFICATION":
+        return notifications.filter((n) =>
+          [
+            "VERIFICATION_APPROVED",
+            "VERIFICATION_REJECTED",
+            "VERIFICATION_SUBMITTED",
+          ].includes(n.type)
+        )
+      case "REVIEWS":
+        return notifications.filter((n) => n.type === "RATING_RECEIVED")
+      default:
+        return notifications
     }
-    return notifications
-  }, [notifications, activeFilter])
+  }, [notifications, activeCategory])
+
+  // Group notifications into Date clusters
+  const groupedNotifications = React.useMemo(() => {
+    const groups: { [key: string]: NotificationItem[] } = {
+      Today: [],
+      Yesterday: [],
+      "This Week": [],
+      Earlier: [],
+    }
+
+    filteredNotifications.forEach((n) => {
+      if (isToday(n.createdAt)) {
+        groups.Today.push(n)
+      } else if (isYesterday(n.createdAt)) {
+        groups.Yesterday.push(n)
+      } else if (isThisWeek(n.createdAt)) {
+        groups["This Week"].push(n)
+      } else {
+        groups.Earlier.push(n)
+      }
+    })
+
+    return groups
+  }, [filteredNotifications])
 
   const handleMarkRead = (id: string) => {
     startTransition(async () => {
@@ -90,92 +198,123 @@ export function NotificationList({
 
   return (
     <div className="space-y-6">
-      {/* Header Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/80">
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant={activeFilter === "ALL" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter("ALL")}
-            className="rounded-lg h-8 gap-1.5 text-xs font-medium"
-          >
-            <span>All Alerts</span>
-            <Badge
-              variant={activeFilter === "ALL" ? "secondary" : "outline"}
-              className="px-1.5 py-0 text-[10px] h-4 rounded-full"
+      {/* Header Controls & Filter Tabs */}
+      <div className="space-y-4 pb-4 border-b border-border/80">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Scrollable Filter Chips */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {CATEGORIES.map((cat) => {
+              const Icon = cat.icon
+              const isActive = activeCategory === cat.id
+              const isUnreadTab = cat.id === "UNREAD"
+              return (
+                <Button
+                  key={cat.id}
+                  variant={isActive ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setActiveCategory(cat.id)}
+                  className="rounded-xl h-8 gap-1.5 text-xs font-semibold shrink-0"
+                >
+                  <Icon className="size-3.5" />
+                  <span>{cat.label}</span>
+                  {isUnreadTab && unreadCount > 0 && (
+                    <Badge
+                      className="px-1.5 py-0 text-[10px] h-4 rounded-full bg-emerald-500 text-white font-mono"
+                    >
+                      {unreadCount}
+                    </Badge>
+                  )}
+                  {cat.id === "ALL" && (
+                    <Badge
+                      variant={isActive ? "secondary" : "outline"}
+                      className="px-1.5 py-0 text-[10px] h-4 rounded-full font-mono"
+                    >
+                      {notifications.length}
+                    </Badge>
+                  )}
+                </Button>
+              )
+            })}
+          </div>
+
+          {/* Mark All As Read Bulk Action */}
+          {unreadCount > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleMarkAllRead}
+              disabled={isPending}
+              className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8 rounded-xl shrink-0 self-start sm:self-auto"
             >
-              {notifications.length}
-            </Badge>
-          </Button>
-
-          <Button
-            variant={activeFilter === "UNREAD" ? "default" : "outline"}
-            size="sm"
-            onClick={() => setActiveFilter("UNREAD")}
-            className="rounded-lg h-8 gap-1.5 text-xs font-medium"
-          >
-            <span>Unread</span>
-            {unreadCount > 0 && (
-              <Badge
-                variant="success"
-                className="px-1.5 py-0 text-[10px] h-4 rounded-full"
-              >
-                {unreadCount}
-              </Badge>
-            )}
-          </Button>
+              {isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <CheckCheck className="size-3.5 text-emerald-500" />
+              )}
+              <span>Mark all as read</span>
+            </Button>
+          )}
         </div>
-
-        {/* Bulk Action */}
-        {unreadCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleMarkAllRead}
-            disabled={isPending}
-            className="text-xs text-muted-foreground hover:text-foreground gap-1.5 h-8 self-start sm:self-auto"
-          >
-            {isPending ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <CheckCheck className="size-3.5 text-emerald-500" />
-            )}
-            <span>Mark all as read</span>
-          </Button>
-        )}
       </div>
 
-      {/* Notifications Stream */}
-      {displayedNotifications.length === 0 ? (
-        <div className="flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-border/80 bg-card/30">
-          <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mb-4">
-            {activeFilter === "UNREAD" ? (
-              <Sparkles className="size-7 text-emerald-500" />
-            ) : (
-              <Inbox className="size-7" />
-            )}
+      {/* Notification Stream or Empty State */}
+      {filteredNotifications.length === 0 ? (
+        <div className="text-center py-16 px-4 rounded-2xl border-2 border-dashed border-border/70 bg-card/40 space-y-4">
+          <div className="flex size-14 items-center justify-center rounded-2xl bg-muted/60 text-muted-foreground mx-auto">
+            <Inbox className="size-7 opacity-60" />
           </div>
-          <h3 className="font-semibold text-base text-foreground mb-1">
-            {activeFilter === "UNREAD" ? "You're all caught up!" : "No notifications yet"}
-          </h3>
-          <p className="text-xs sm:text-sm text-muted-foreground max-w-sm">
-            {activeFilter === "UNREAD"
-              ? "There are no unread alerts in your inbox right now."
-              : "When teammates apply to your squad, send you invites, or submit reviews, alerts will appear here."}
-          </p>
+          <div className="space-y-1.5 max-w-md mx-auto">
+            <h3 className="text-base font-bold text-foreground">
+              {activeCategory === "UNREAD" ? "No unread alerts" : "You're all caught up"}
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {activeCategory === "UNREAD"
+                ? "You have acknowledged all your notifications. Switch to All Alerts to browse history."
+                : "Team invitations, application updates, verification decisions, and important event activity will appear here."}
+            </p>
+          </div>
+          <div className="pt-2 flex items-center justify-center gap-2">
+            <Button asChild size="sm" variant="outline" className="rounded-xl text-xs gap-1.5">
+              <Link href="/discover">
+                <Compass className="size-3.5 text-primary" />
+                <span>Find Teammates</span>
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline" className="rounded-xl text-xs gap-1.5">
+              <Link href="/events">
+                <Calendar className="size-3.5 text-purple-500" />
+                <span>Explore Hackathons</span>
+              </Link>
+            </Button>
+          </div>
         </div>
       ) : (
-        <div className="space-y-3" role="feed" aria-label="Notifications Stream">
-          {displayedNotifications.map((notification) => (
-            <NotificationItemCard
-              key={notification.id}
-              notification={notification}
-              onMarkRead={handleMarkRead}
-              onDelete={handleDelete}
-              isPending={isPending}
-            />
-          ))}
+        <div className="space-y-8">
+          {Object.entries(groupedNotifications).map(([groupTitle, items]) => {
+            if (items.length === 0) return null
+            return (
+              <div key={groupTitle} className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <h2 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                    {groupTitle}
+                  </h2>
+                  <div className="h-px bg-border/60 flex-1" />
+                </div>
+
+                <div className="space-y-3">
+                  {items.map((notification) => (
+                    <NotificationItemCard
+                      key={notification.id}
+                      notification={notification}
+                      onMarkRead={handleMarkRead}
+                      onDelete={handleDelete}
+                      isPending={isPending}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

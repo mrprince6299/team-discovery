@@ -55,10 +55,17 @@ export async function createTeamRole(input: {
           status: 'ACTIVE',
           membershipRole: { in: ['LEADER', 'CO_LEADER'] },
         },
+        include: {
+          user: { select: { isSuspended: true } },
+        },
       })
 
       if (!leaderMembership) {
         throw new Error('Unauthorized: Only team leaders can create team roles.')
+      }
+
+      if (leaderMembership.user.isSuspended) {
+        throw new Error('Your account is currently suspended. Role creation is disabled.')
       }
 
       // Create TeamRole
@@ -159,10 +166,17 @@ export async function updateTeamRole(input: {
           status: 'ACTIVE',
           membershipRole: { in: ['LEADER', 'CO_LEADER'] },
         },
+        include: {
+          user: { select: { isSuspended: true } },
+        },
       })
 
       if (!leaderMembership) {
         throw new Error('Unauthorized: Only team leaders can update team roles.')
+      }
+
+      if (leaderMembership.user.isSuspended) {
+        throw new Error('Your account is currently suspended. Role updates are disabled.')
       }
 
       // 2. Check occupied seats
@@ -321,10 +335,17 @@ export async function closeTeamRole(input: {
           status: 'ACTIVE',
           membershipRole: { in: ['LEADER', 'CO_LEADER'] },
         },
+        include: {
+          user: { select: { isSuspended: true } },
+        },
       })
 
       if (!leaderMembership) {
         throw new Error('Unauthorized: Only team leaders can close team roles.')
+      }
+
+      if (leaderMembership.user.isSuspended) {
+        throw new Error('Your account is currently suspended. Role management is disabled.')
       }
 
       if (role.status === 'CLOSED') {
@@ -441,10 +462,17 @@ export async function deleteTeamRole(input: {
           status: 'ACTIVE',
           membershipRole: { in: ['LEADER', 'CO_LEADER'] },
         },
+        include: {
+          user: { select: { isSuspended: true } },
+        },
       })
 
       if (!leaderMembership) {
         throw new Error('Unauthorized: Only team leaders can delete team roles.')
+      }
+
+      if (leaderMembership.user.isSuspended) {
+        throw new Error('Your account is currently suspended. Role deletion is disabled.')
       }
 
       if (role.members.length > 0) {

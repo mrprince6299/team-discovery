@@ -64,6 +64,12 @@ export default async function AdminOverviewPage() {
         </div>
 
         <div className="flex items-center gap-2.5 shrink-0">
+          <Button asChild variant="outline" size="sm" className="gap-1.5 font-semibold shadow-2xs">
+            <Link href="/admin/reports">
+              <ShieldAlert className="size-4 text-destructive" />
+              <span>Moderation Queue</span>
+            </Link>
+          </Button>
           <Button asChild size="sm" className="gap-1.5 font-semibold shadow-xs">
             <Link href="/admin/verify">
               <ShieldCheck className="size-4" />

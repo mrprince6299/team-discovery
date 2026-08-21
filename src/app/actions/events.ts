@@ -2,8 +2,19 @@
 
 import { prisma } from '@/lib/prisma'
 import { isCurrentUserAdmin } from '@/app/actions/verification'
+import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { EventStatus, TeamStatus } from '@prisma/client'
+
+async function getAuthUserId(): Promise<string | null> {
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    return user?.id || null
+  } catch {
+    return null
+  }
+}
 
 export interface EventCatalogItem {
   id: string
@@ -52,6 +63,14 @@ export interface EventShowcaseData {
       skills: string[]
     }>
   }>
+  currentUserState?: {
+    isRegistered: boolean
+    teamId?: string
+    teamName?: string
+    isLeader?: boolean
+    hasPendingApplication?: boolean
+    pendingTeamName?: string
+  }
   announcements: Array<{
     id: string
     title: string
@@ -228,6 +247,55 @@ export async function getEventShowcaseDetails(
       }
     })
 
+    // Fetch current user participation state if authenticated
+    const currentUserId = await getAuthUserId()
+    let currentUserState: EventShowcaseData['currentUserState'] = undefined
+
+    if (currentUserId) {
+      const activeMember = await prisma.teamMember.findFirst({
+        where: {
+          userId: currentUserId,
+          status: 'ACTIVE',
+          team: { eventId: rawEvent.id },
+        },
+        include: {
+          team: {
+            select: { id: true, name: true },
+          },
+        },
+      })
+
+      if (activeMember) {
+        currentUserState = {
+          isRegistered: true,
+          teamId: activeMember.team.id,
+          teamName: activeMember.team.name,
+          isLeader: activeMember.membershipRole === 'LEADER' || activeMember.membershipRole === 'CO_LEADER',
+        }
+      } else {
+        const pendingApp = await prisma.application.findFirst({
+          where: {
+            userId: currentUserId,
+            status: 'PENDING',
+            team: { eventId: rawEvent.id },
+          },
+          include: {
+            team: {
+              select: { name: true },
+            },
+          },
+        })
+
+        if (pendingApp) {
+          currentUserState = {
+            isRegistered: false,
+            hasPendingApplication: true,
+            pendingTeamName: pendingApp.team.name,
+          }
+        }
+      }
+    }
+
     const eventData: EventShowcaseData = {
       id: rawEvent.id,
       name: rawEvent.name,
@@ -240,6 +308,7 @@ export async function getEventShowcaseDetails(
       teamSizeInfo: rawEvent.teamSizeInfo,
       status: rawEvent.status,
       teams: formattedTeams,
+      currentUserState,
       announcements: rawEvent.announcements.map((a) => ({
         id: a.id,
         title: a.title,

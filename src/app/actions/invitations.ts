@@ -54,8 +54,8 @@ export async function createInvitation(input: {
       where: { id: input.recipientId }
     })
 
-    if (!recipient || !isUserEligibleForCoreFeatures(recipient.verificationStatus)) {
-      return { error: 'Recipient is not an approved verified user.' }
+    if (!recipient || !isUserEligibleForCoreFeatures(recipient.verificationStatus, recipient.isSuspended)) {
+      return { error: 'Recipient account is suspended or ineligible for invitations.' }
     }
 
     // 3. Verify team and role are active
@@ -209,6 +209,15 @@ export async function acceptInvitation(invitationId: string, actorUserId?: strin
 
       if (!['ACTIVE', 'PARTIALLY_FILLED'].includes(lockedRole.status)) {
         throw new Error(`Role is not open (current status: ${lockedRole.status}).`)
+      }
+
+      // Verify recipient is not suspended
+      const recipient = await tx.user.findUnique({
+        where: { id: currentUserId },
+        select: { id: true, isSuspended: true },
+      })
+      if (!recipient || recipient.isSuspended) {
+        throw new Error('Cannot accept invitation: your account is currently suspended.')
       }
 
       if (new Date() >= new Date(lockedRole.expiry)) {

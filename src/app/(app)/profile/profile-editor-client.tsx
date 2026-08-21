@@ -508,6 +508,12 @@ export function ProfileEditorClient({
 
         <div className="flex items-center gap-2.5">
           <Button asChild variant="outline" size="sm" className="gap-1.5 shadow-2xs font-semibold">
+            <Link href="/onboarding">
+              <Sparkles className="size-4 text-primary" />
+              <span>Guided Setup</span>
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="gap-1.5 shadow-2xs font-semibold">
             <Link href={`/users/${profile.id}`}>
               <Eye className="size-4 text-primary" />
               <span>View Public Profile</span>

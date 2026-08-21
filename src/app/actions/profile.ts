@@ -6,11 +6,20 @@ import { prisma } from '@/lib/prisma'
 import { Availability, SkillLevel } from '@prisma/client'
 import { AUTHORITATIVE_SKILLS, formatProfileBio } from '@/lib/constants/options'
 
-async function getAuthenticatedUser() {
+async function getAuthenticatedUser(checkSuspended = false) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     throw new Error('Authentication required')
+  }
+  if (checkSuspended) {
+    const dbUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { isSuspended: true },
+    })
+    if (dbUser?.isSuspended) {
+      throw new Error('Your account is currently suspended. Profile mutations are disabled.')
+    }
   }
   return user
 }
@@ -76,11 +85,13 @@ export async function getMyProfile() {
     stats: {
       totalRatings,
       avgRating: Number(avgRating.toFixed(1)),
+      projectsCount: profile.projects.length,
+      skillsCount: profile.skills.length,
     },
   }
 }
 
-export async function getPublicProfile(userId: string) {
+export async function getPublicProfile(userId: string, viewerUserId?: string) {
   const profile = await prisma.user.findUnique({
     where: { id: userId },
     select: {
@@ -92,6 +103,7 @@ export async function getPublicProfile(userId: string) {
       year: true,
       availability: true,
       verificationStatus: true,
+      isSuspended: true,
       createdAt: true,
       college: {
         select: {
@@ -202,11 +214,17 @@ export async function getPublicProfile(userId: string) {
     ? profile.ratingsReceived.reduce((acc: number, r: { score: number }) => acc + r.score, 0) / totalRatings
     : 0
 
+  const isOwner = viewerUserId && viewerUserId === userId
+  const safePrivateData = isOwner ? profile.privateData : null
+
   return {
     ...profile,
+    privateData: safePrivateData,
     stats: {
       totalRatings,
       avgRating: Number(avgRating.toFixed(1)),
+      projectsCount: profile.projects.length,
+      skillsCount: profile.skills.length,
     },
   }
 }
@@ -310,6 +328,15 @@ export async function updateBasicProfile(data: {
   }
 
   try {
+    const existingUser = await prisma.user.findUnique({
+      where: { id: authUser.id },
+      select: { isSuspended: true },
+    })
+
+    if (existingUser?.isSuspended) {
+      return { error: 'Your account is currently suspended. Profile updates are disabled.' }
+    }
+
     let finalCollegeId = data.collegeId || null
     let finalDeptId = data.departmentId || null
 
@@ -443,7 +470,7 @@ export async function getAllCollegesAndDepartments() {
 export async function addUserSkillsBatch(
   skills: Array<{ skillIdOrName: string; level?: SkillLevel }>
 ) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   if (!skills || skills.length === 0) {
     return { error: 'No skills provided' }
@@ -494,7 +521,7 @@ export async function addUserSkillsBatch(
 }
 
 export async function addUserSkill(skillIdOrName: string, level: SkillLevel) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   if (!skillIdOrName || !level) {
     return { error: 'Skill and level are required' }
@@ -538,7 +565,7 @@ export async function addUserSkill(skillIdOrName: string, level: SkillLevel) {
 }
 
 export async function removeUserSkill(skillId: string) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   try {
     await prisma.userSkill.deleteMany({
@@ -557,7 +584,7 @@ export async function removeUserSkill(skillId: string) {
 }
 
 export async function addUserInterest(skillIdOrName: string) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   if (!skillIdOrName) {
     return { error: 'Interest is required' }
@@ -595,7 +622,7 @@ export async function addUserInterest(skillIdOrName: string) {
 }
 
 export async function removeUserInterest(skillId: string) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   try {
     await prisma.userInterest.deleteMany({
@@ -624,7 +651,7 @@ export async function createProject(data: {
   isPrivate?: boolean
   skillIds?: string[]
 }) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   if (!data.title?.trim() || !data.description?.trim() || !data.role?.trim()) {
     return { error: 'Title, description, and role are required' }
@@ -661,7 +688,7 @@ export async function createProject(data: {
 }
 
 export async function deleteProject(projectId: string) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   try {
     // Ensure ownership
@@ -691,7 +718,7 @@ export async function createAchievement(data: {
   date: string
   link?: string | null
 }) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   if (!data.title?.trim() || !data.description?.trim()) {
     return { error: 'Title and description are required' }
@@ -717,7 +744,7 @@ export async function createAchievement(data: {
 }
 
 export async function deleteAchievement(achievementId: string) {
-  const authUser = await getAuthenticatedUser()
+  const authUser = await getAuthenticatedUser(true)
 
   try {
     const achievement = await prisma.achievement.findFirst({
@@ -737,5 +764,232 @@ export async function deleteAchievement(achievementId: string) {
     return { success: true }
   } catch (error) {
     return { error: error instanceof Error ? error.message : 'Failed to delete achievement' }
+  }
+}
+
+export async function addUserInterestsBatch(interestIdsOrNames: string[]) {
+  const authUser = await getAuthenticatedUser(true)
+
+  if (!interestIdsOrNames || interestIdsOrNames.length === 0) {
+    return { error: 'No interests provided' }
+  }
+
+  try {
+    let addedCount = 0
+    for (const item of interestIdsOrNames) {
+      let resolvedSkillId = item
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item)
+      if (item.startsWith('auth-') || item.startsWith('custom-') || !isUuid) {
+        const rawName = item.replace(/^(auth|custom)-/, '')
+        const ensured = await ensureSkillByName(rawName)
+        if (ensured) resolvedSkillId = ensured.id
+      }
+
+      await prisma.userInterest.upsert({
+        where: {
+          userId_skillId: {
+            userId: authUser.id,
+            skillId: resolvedSkillId,
+          },
+        },
+        update: {},
+        create: {
+          userId: authUser.id,
+          skillId: resolvedSkillId,
+        },
+      })
+      addedCount++
+    }
+
+    revalidatePath('/profile')
+    revalidatePath(`/users/${authUser.id}`)
+    return { success: true, addedCount }
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Failed to add interests in batch' }
+  }
+}
+
+export async function saveOnboardingProfile(data: {
+  name: string
+  collegeName?: string | null
+  collegeEmail?: string | null
+  erp?: string | null
+  programName?: string | null
+  branchName?: string | null
+  year?: number | null
+  role?: string | null
+  bio?: string | null
+  availability: Availability
+  skills?: Array<{ skillIdOrName: string; level: SkillLevel }>
+  interests?: string[]
+}) {
+  const authUser = await getAuthenticatedUser()
+
+  try {
+    // 1. Update basic profile & academics
+    const basicRes = await updateBasicProfile({
+      name: data.name,
+      collegeName: data.collegeName,
+      collegeEmail: data.collegeEmail,
+      erp: data.erp,
+      programName: data.programName,
+      branchName: data.branchName,
+      year: data.year,
+      role: data.role,
+      bio: data.bio,
+      availability: data.availability,
+    })
+
+    if (basicRes.error) {
+      return { error: basicRes.error }
+    }
+
+    // 2. Add skills in batch if provided
+    if (data.skills && data.skills.length > 0) {
+      await addUserSkillsBatch(data.skills)
+    }
+
+    // 3. Add interests in batch if provided
+    if (data.interests && data.interests.length > 0) {
+      await addUserInterestsBatch(data.interests)
+    }
+
+    revalidatePath('/profile')
+    revalidatePath('/dashboard')
+    revalidatePath(`/users/${authUser.id}`)
+    revalidatePath('/verify/student')
+
+    return { success: true }
+  } catch (err: any) {
+    return { error: err.message || 'Failed to complete onboarding profile' }
+  }
+}
+
+/**
+ * Evaluates candidate fit against a specific recruitment role for contextual profile presentation.
+ */
+export async function getCandidateRoleFit(candidateId: string, roleId: string) {
+  try {
+    const [role, candidate] = await Promise.all([
+      prisma.teamRole.findUnique({
+        where: { id: roleId },
+        include: {
+          team: {
+            select: {
+              id: true,
+              name: true,
+              event: {
+                select: { id: true, name: true },
+              },
+            },
+          },
+          skills: {
+            include: { skill: true },
+          },
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: candidateId },
+        include: {
+          skills: {
+            include: { skill: true },
+          },
+          interests: {
+            include: { skill: true },
+          },
+        },
+      }),
+    ])
+
+    if (!role || !candidate) return null
+
+    const candidateSkillMap = new Map(candidate.skills.map((s) => [s.skill.name.toLowerCase(), s.level]))
+    const candidateSkillIds = new Set(candidate.skills.map((s) => s.skillId))
+
+    const requiredSkills = role.skills.filter((s) => s.requirementType === 'REQUIRED')
+    const preferredSkills = role.skills.filter((s) => s.requirementType === 'PREFERRED')
+
+    const matchedRequired = requiredSkills.filter(
+      (rs) => candidateSkillIds.has(rs.skillId) || candidateSkillMap.has(rs.skill.name.toLowerCase())
+    )
+
+    const requiredCoverage =
+      requiredSkills.length > 0
+        ? Math.round((matchedRequired.length / requiredSkills.length) * 100)
+        : 100
+
+    return {
+      role: {
+        id: role.id,
+        name: role.name,
+        teamId: role.team.id,
+        teamName: role.team.name,
+        eventName: role.team.event?.name || null,
+        seatsRequired: role.seatsRequired,
+      },
+      requiredSkills: requiredSkills.map((s) => ({
+        id: s.skill.id,
+        name: s.skill.name,
+        isMatched: candidateSkillIds.has(s.skillId) || candidateSkillMap.has(s.skill.name.toLowerCase()),
+        candidateLevel: candidateSkillMap.get(s.skill.name.toLowerCase()) || null,
+      })),
+      preferredSkills: preferredSkills.map((s) => ({
+        id: s.skill.id,
+        name: s.skill.name,
+        isMatched: candidateSkillIds.has(s.skillId) || candidateSkillMap.has(s.skill.name.toLowerCase()),
+        candidateLevel: candidateSkillMap.get(s.skill.name.toLowerCase()) || null,
+      })),
+      matchedRequiredCount: matchedRequired.length,
+      totalRequiredCount: requiredSkills.length,
+      requiredCoverage,
+      isExact: matchedRequired.length === requiredSkills.length && requiredSkills.length > 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Fetches active recruitment roles owned by the viewer for sending invitations.
+ */
+export async function getViewerActiveRoles(viewerUserId: string) {
+  try {
+    const memberships = await prisma.teamMember.findMany({
+      where: {
+        userId: viewerUserId,
+        status: 'ACTIVE',
+        membershipRole: { in: ['LEADER', 'CO_LEADER'] },
+      },
+      include: {
+        team: {
+          include: {
+            roles: {
+              where: { status: 'ACTIVE' },
+              include: {
+                skills: {
+                  where: { requirementType: 'REQUIRED' },
+                  include: { skill: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    })
+
+    const activeRoles = memberships.flatMap((m) =>
+      m.team.roles.map((r) => ({
+        id: r.id,
+        name: r.name,
+        teamId: m.team.id,
+        teamName: m.team.name,
+        remainingSeats: r.seatsRequired,
+        requiredSkills: r.skills.map((s) => ({ id: s.skill.id, name: s.skill.name })),
+      }))
+    )
+
+    return activeRoles
+  } catch {
+    return []
   }
 }

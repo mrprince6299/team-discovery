@@ -107,6 +107,31 @@ enum TargetType {
   PROJECT
 }
 
+enum ReportTargetType {
+  USER
+  TEAM
+  MESSAGE
+  FILE
+  LINK
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportReason {
+  HARASSMENT
+  SPAM
+  INAPPROPRIATE_CONTENT
+  FAKE_PROFILE
+  MISLEADING_INFO
+  SUSPICIOUS_ACTIVITY
+  OTHER
+}
+
 // ==========================================
 // IDENTITY & PROFILE
 // ==========================================
@@ -177,7 +202,19 @@ model User {
   bookmarks             Bookmark[]
   activityLogs          ActivityLog[]
 
+  // Moderation & Suspension
+  isSuspended      Boolean   @default(false) @map("is_suspended")
+  suspendedAt      DateTime? @map("suspended_at")
+  suspendedById    String?   @map("suspended_by_id") @db.Uuid
+  suspensionReason String?   @map("suspension_reason")
+
+  suspendedBy     User?    @relation("SuspensionReviewer", fields: [suspendedById], references: [id])
+  suspendedUsers  User[]   @relation("SuspensionReviewer")
+  filedReports    Report[] @relation("Reporter")
+  resolvedReports Report[] @relation("Resolver")
+
   @@index([username])
+  @@index([isSuspended])
   @@index([verificationStatus])
   @@index([collegeId])
   @@index([departmentId])
@@ -629,4 +666,33 @@ model ActivityLog {
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("activity_logs")
+}
+
+// ==========================================
+// TRUST, SAFETY & MODERATION
+// ==========================================
+
+model Report {
+  id             String           @id @default(uuid()) @db.Uuid
+  reporterId     String           @map("reporter_id") @db.Uuid
+  targetType     ReportTargetType @map("target_type")
+  targetId       String           @map("target_id") @db.Uuid
+  reason         ReportReason
+  description    String?
+  status         ReportStatus     @default(OPEN)
+  resolverId     String?          @map("resolver_id") @db.Uuid
+  resolutionNote String?          @map("resolution_note")
+  actionTaken    String?          @map("action_taken")
+  resolvedAt     DateTime?        @map("resolved_at")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  reporter User  @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  resolver User? @relation("Resolver", fields: [resolverId], references: [id])
+
+  @@index([reporterId])
+  @@index([targetType, targetId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("reports")
 }

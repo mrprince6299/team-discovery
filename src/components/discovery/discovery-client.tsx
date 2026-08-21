@@ -10,8 +10,6 @@ import {
   Layers,
   Flame,
   PlusCircle,
-  Loader2,
-  Calendar,
   Sparkles,
   Search,
 } from "lucide-react"
@@ -51,6 +49,41 @@ interface DiscoveryClientProps {
   preselectedCandidateId?: string
 }
 
+function CandidateCardSkeleton() {
+  return (
+    <Card className="rounded-2xl border border-border/80 bg-card p-5 space-y-4 animate-pulse">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="size-12 rounded-xl bg-muted" />
+          <div className="space-y-1.5">
+            <div className="h-4 w-28 bg-muted rounded" />
+            <div className="h-3 w-16 bg-muted rounded" />
+          </div>
+        </div>
+        <div className="h-6 w-24 bg-muted rounded-full" />
+      </div>
+
+      <div className="h-3 w-48 bg-muted rounded" />
+
+      <div className="space-y-2 pt-2 border-t border-border/60">
+        <div className="h-3 w-32 bg-muted rounded" />
+        <div className="flex gap-1.5">
+          <div className="h-6 w-16 bg-muted rounded-md" />
+          <div className="h-6 w-20 bg-muted rounded-md" />
+          <div className="h-6 w-14 bg-muted rounded-md" />
+        </div>
+      </div>
+
+      <div className="h-16 bg-muted/60 rounded-xl" />
+
+      <div className="flex justify-between pt-2 border-t border-border/60">
+        <div className="h-8 w-20 bg-muted rounded" />
+        <div className="h-8 w-28 bg-muted rounded" />
+      </div>
+    </Card>
+  )
+}
+
 export function DiscoveryClient({
   initialRoles,
   departments,
@@ -81,10 +114,12 @@ export function DiscoveryClient({
 
   // Filters State
   const [filters, setFilters] = useState<FilterState>({
+    searchQuery: "",
     departmentId: "ALL",
     year: "ALL",
     availability: "ALL",
     minExperience: "ALL",
+    verificationOnly: false,
   })
 
   // Selected Role Object
@@ -114,21 +149,50 @@ export function DiscoveryClient({
   const applyFilters = useCallback(
     (list: Candidate[]) => {
       return list.filter((c) => {
+        // Keyword Search Filter
+        if (filters.searchQuery.trim().length > 0) {
+          const q = filters.searchQuery.toLowerCase().trim()
+          const matchName = c.name.toLowerCase().includes(q)
+          const matchUsername = c.username.toLowerCase().includes(q)
+          const matchBio = c.bio?.toLowerCase().includes(q)
+          const matchDept = c.department?.name.toLowerCase().includes(q)
+          const matchSkills = c.matchedRequiredSkills.some((s) => s.name.toLowerCase().includes(q)) ||
+            c.matchedRelatedSkills.some((s) => s.name.toLowerCase().includes(q)) ||
+            c.matchedInterests.some((i) => i.name.toLowerCase().includes(q))
+
+          if (!matchName && !matchUsername && !matchBio && !matchDept && !matchSkills) {
+            return false
+          }
+        }
+
+        // Department Filter
         if (filters.departmentId !== "ALL" && c.department?.id !== filters.departmentId) {
           return false
         }
+
+        // Academic Year Filter
         if (filters.year !== "ALL" && String(c.year) !== filters.year) {
           return false
         }
+
+        // Availability Filter
         if (filters.availability !== "ALL" && c.availability !== filters.availability) {
           return false
         }
+
+        // Minimum Experience Filter
         if (filters.minExperience !== "ALL") {
           const expRank: Record<string, number> = { BEGINNER: 1, SOME_EXPERIENCE: 2, EXPERIENCED: 3 }
           const candRank = expRank[c.experienceLevel] || 1
           const requiredRank = expRank[filters.minExperience] || 1
           if (candRank < requiredRank) return false
         }
+
+        // Verification Only Filter
+        if (filters.verificationOnly && c.verificationStatus !== "APPROVED") {
+          return false
+        }
+
         return true
       })
     },
@@ -144,16 +208,18 @@ export function DiscoveryClient({
 
   const totalFilteredCount = filteredExact.length + filteredRelated.length + filteredInterest.length
 
-  const handleFilterChange = (key: keyof FilterState, value: string) => {
+  const handleFilterChange = (key: keyof FilterState, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value }))
   }
 
   const handleResetFilters = () => {
     setFilters({
+      searchQuery: "",
       departmentId: "ALL",
       year: "ALL",
       availability: "ALL",
       minExperience: "ALL",
+      verificationOnly: false,
     })
   }
 
@@ -240,29 +306,32 @@ export function DiscoveryClient({
             <span>Deterministic Role Matching Engine</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-            Find Teammates for Your Role
+            Find Teammates
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Select an active recruitment role to load candidates ranked by exact skill coverage and project experience.
+            Browse qualified builders ranked by exact skill coverage, portfolio evidence, and institutional verification.
           </p>
         </div>
 
         {/* Role Selector Picker */}
-        <div className="w-full sm:w-72 space-y-1.5 shrink-0">
-          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Active Recruitment Role
+        <div className="w-full sm:w-80 space-y-1.5 shrink-0">
+          <label className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+            <span>Matching For Role:</span>
+            <span className="text-primary font-mono lowercase">{initialRoles.length} active</span>
           </label>
           <Select value={selectedRoleId} onValueChange={setSelectedRoleId}>
-            <SelectTrigger className="h-10 font-medium">
+            <SelectTrigger className="h-10 font-medium rounded-xl bg-card border-border/80">
               <SelectValue placeholder="Choose role..." />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="rounded-xl">
               {initialRoles.map((role) => (
                 <SelectItem key={role.id} value={role.id}>
-                  <span className="font-semibold text-foreground">{role.name}</span>
-                  <span className="text-muted-foreground text-xs block truncate">
-                    {role.teamName} · {role.remainingSeats} seat{role.remainingSeats !== 1 ? "s" : ""} left
-                  </span>
+                  <div className="text-left">
+                    <span className="font-semibold text-foreground block">{role.name}</span>
+                    <span className="text-muted-foreground text-[11px] block truncate">
+                      {role.teamName} · {role.remainingSeats} seat{role.remainingSeats !== 1 ? "s" : ""} open
+                    </span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -272,9 +341,9 @@ export function DiscoveryClient({
 
       {/* Selected Role Context Banner */}
       {selectedRole && (
-        <Card className="border-border/80 bg-muted/20 shadow-xs rounded-2xl">
+        <Card className="border-border/80 bg-gradient-to-r from-muted/30 via-card to-primary/5 shadow-xs rounded-2xl">
           <CardContent className="p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="font-bold text-base text-foreground">{selectedRole.teamName}</span>
                 <span className="text-muted-foreground">·</span>
@@ -282,15 +351,16 @@ export function DiscoveryClient({
                   {selectedRole.name}
                 </Badge>
                 <Badge variant="secondary" className="text-xs">
-                  {selectedRole.remainingSeats} of {selectedRole.seatsRequired} Seats Available
+                  {selectedRole.remainingSeats} of {selectedRole.seatsRequired} Seats Open
                 </Badge>
+                {selectedRole.eventName && (
+                  <Badge variant="outline" className="text-[11px] text-muted-foreground">
+                    Event: {selectedRole.eventName}
+                  </Badge>
+                )}
               </div>
 
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="size-3.5" />
-                  <span>Event: {selectedRole.eventName}</span>
-                </span>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="font-semibold text-foreground">Required Skills:</span>
                   {selectedRole.requiredSkills.map((s) => (
@@ -298,23 +368,37 @@ export function DiscoveryClient({
                       {s.name}
                     </Badge>
                   ))}
+                  {selectedRole.requiredSkills.length === 0 && (
+                    <span className="italic text-muted-foreground">None specified</span>
+                  )}
                 </div>
+
+                {selectedRole.preferredSkills.length > 0 && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-semibold text-foreground">Preferred:</span>
+                    {selectedRole.preferredSkills.map((s) => (
+                      <Badge key={s.id} variant="outline" className="text-[10px] px-1.5 py-0">
+                        {s.name}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Quick Match Count Badges */}
-            <div className="flex items-center gap-3 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/60">
-              <div className="text-center px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
-                <div className="text-base font-extrabold text-emerald-700 dark:text-emerald-300">
+            <div className="flex items-center gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/60">
+              <div className="text-center px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 min-w-[72px]">
+                <div className="text-base font-extrabold text-emerald-700 dark:text-emerald-300 font-mono">
                   {candidates.EXACT.length}
                 </div>
                 <div className="text-[10px] uppercase font-semibold text-emerald-800 dark:text-emerald-400">
-                  Exact Matches
+                  Exact
                 </div>
               </div>
 
-              <div className="text-center px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                <div className="text-base font-extrabold text-blue-700 dark:text-blue-300">
+              <div className="text-center px-3 py-1.5 rounded-xl bg-blue-500/10 border border-blue-500/30 min-w-[72px]">
+                <div className="text-base font-extrabold text-blue-700 dark:text-blue-300 font-mono">
                   {candidates.RELATED.length}
                 </div>
                 <div className="text-[10px] uppercase font-semibold text-blue-800 dark:text-blue-400">
@@ -322,8 +406,8 @@ export function DiscoveryClient({
                 </div>
               </div>
 
-              <div className="text-center px-3 py-1.5 rounded-xl bg-slate-500/10 border border-slate-500/30">
-                <div className="text-base font-extrabold text-slate-700 dark:text-slate-300">
+              <div className="text-center px-3 py-1.5 rounded-xl bg-slate-500/10 border border-slate-500/30 min-w-[72px]">
+                <div className="text-base font-extrabold text-slate-700 dark:text-slate-300 font-mono">
                   {candidates.INTEREST_ONLY.length}
                 </div>
                 <div className="text-[10px] uppercase font-semibold text-slate-800 dark:text-slate-400">
@@ -344,12 +428,18 @@ export function DiscoveryClient({
         totalResultsCount={totalFilteredCount}
       />
 
-      {/* Loading State */}
+      {/* Loading State Skeletons */}
       {isLoading && (
-        <div className="py-16 text-center space-y-3">
-          <Loader2 className="size-8 animate-spin mx-auto text-primary" />
-          <p className="text-sm font-semibold text-foreground">Matching candidates for role...</p>
-          <p className="text-xs text-muted-foreground">Evaluating verified skills, portfolios, and availability.</p>
+        <div className="space-y-4">
+          <div className="h-6 w-48 bg-muted rounded animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <CandidateCardSkeleton />
+            <CandidateCardSkeleton />
+            <CandidateCardSkeleton />
+            <CandidateCardSkeleton />
+            <CandidateCardSkeleton />
+            <CandidateCardSkeleton />
+          </div>
         </div>
       )}
 
@@ -357,11 +447,11 @@ export function DiscoveryClient({
       {!isLoading && (
         <div className="space-y-10">
           {totalFilteredCount === 0 ? (
-            <div className="py-16 text-center border border-dashed border-border rounded-2xl p-8 space-y-3">
+            <div className="py-16 text-center border border-dashed border-border/80 rounded-2xl p-8 space-y-3 bg-card">
               <Search className="size-8 mx-auto text-muted-foreground/60" />
-              <h3 className="text-base font-bold text-foreground">No Candidates Matched Filters</h3>
+              <h3 className="text-base font-bold text-foreground">No Candidates Matched Your Filters</h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Try widening your department, year, or availability filters to view more candidates.
+                No qualified teammates match the active filters for {selectedRole?.name}. Try clearing some filters or searching for related skills.
               </p>
               <Button variant="outline" size="sm" onClick={handleResetFilters} className="text-xs">
                 Reset All Filters
@@ -390,6 +480,9 @@ export function DiscoveryClient({
                       <CandidateCard
                         key={candidate.id}
                         candidate={candidate}
+                        activeRoleId={selectedRole?.id}
+                        roleRequiredSkills={selectedRole?.requiredSkills}
+                        rolePreferredSkills={selectedRole?.preferredSkills}
                         onInviteClick={handleOpenInvite}
                         isAlreadyInvited={invitedCandidateIds.has(candidate.id)}
                       />
@@ -419,6 +512,9 @@ export function DiscoveryClient({
                       <CandidateCard
                         key={candidate.id}
                         candidate={candidate}
+                        activeRoleId={selectedRole?.id}
+                        roleRequiredSkills={selectedRole?.requiredSkills}
+                        rolePreferredSkills={selectedRole?.preferredSkills}
                         onInviteClick={handleOpenInvite}
                         isAlreadyInvited={invitedCandidateIds.has(candidate.id)}
                       />
@@ -448,6 +544,9 @@ export function DiscoveryClient({
                       <CandidateCard
                         key={candidate.id}
                         candidate={candidate}
+                        activeRoleId={selectedRole?.id}
+                        roleRequiredSkills={selectedRole?.requiredSkills}
+                        rolePreferredSkills={selectedRole?.preferredSkills}
                         onInviteClick={handleOpenInvite}
                         isAlreadyInvited={invitedCandidateIds.has(candidate.id)}
                       />

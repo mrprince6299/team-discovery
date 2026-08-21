@@ -140,6 +140,7 @@ export async function getMatchedCandidatesForRole(roleId: string) {
   // 2. Fetch all candidates (in beta, includes all active candidates; in strict mode, APPROVED only)
   const rawCandidates = await prisma.user.findMany({
     where: {
+      isSuspended: false,
       ...(REQUIRE_INSTITUTIONAL_VERIFICATION ? { verificationStatus: 'APPROVED' } : {}),
       availability: { not: 'TEAM_FULL' },
       // Exclude those already in the team or with pending/accepted application for this team

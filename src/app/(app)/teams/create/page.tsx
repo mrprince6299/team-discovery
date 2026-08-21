@@ -6,13 +6,19 @@ import { TeamCreateClient } from "@/components/teams/team-create-client"
 
 export const dynamic = "force-dynamic"
 
-export default async function TeamCreatePage() {
+interface TeamCreatePageProps {
+  searchParams?: Promise<{ eventId?: string }>
+}
+
+export default async function TeamCreatePage({ searchParams }: TeamCreatePageProps) {
   const supabase = await createClient()
   const { data: { user: authUser } } = await supabase.auth.getUser()
 
   if (!authUser) {
     redirect("/login")
   }
+
+  const { eventId } = (await searchParams) || {}
 
   const [events, skills] = await Promise.all([
     getAvailableEvents(),
@@ -23,6 +29,7 @@ export default async function TeamCreatePage() {
     <TeamCreateClient
       events={events}
       availableSkills={skills}
+      initialEventId={eventId}
     />
   )
 }
